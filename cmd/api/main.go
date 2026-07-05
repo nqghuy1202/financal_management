@@ -2,14 +2,13 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"net/http"
 	"os/signal"
 	"syscall"
 	"time"
 
-	"financal_management/internal/server"
+	"github.com/gin-gonic/gin"
 )
 
 func gracefulShutdown(apiServer *http.Server, done chan bool) {
@@ -39,20 +38,28 @@ func gracefulShutdown(apiServer *http.Server, done chan bool) {
 
 func main() {
 
-	server := server.NewServer()
+	// server := server.NewServer()
 
-	// Create a done channel to signal when the shutdown is complete
-	done := make(chan bool, 1)
+	// // Create a done channel to signal when the shutdown is complete
+	// done := make(chan bool, 1)
 
-	// Run graceful shutdown in a separate goroutine
-	go gracefulShutdown(server, done)
+	// // Run graceful shutdown in a separate goroutine
+	// go gracefulShutdown(server, done)
 
-	err := server.ListenAndServe()
-	if err != nil && err != http.ErrServerClosed {
-		panic(fmt.Sprintf("http server error: %s", err))
-	}
+	// err := server.ListenAndServe()
+	// if err != nil && err != http.ErrServerClosed {
+	// 	panic(fmt.Sprintf("http server error: %s", err))
+	// }
 
-	// Wait for the graceful shutdown to complete
-	<-done
-	log.Println("Graceful shutdown complete.")
+	// // Wait for the graceful shutdown to complete
+	// <-done
+	// log.Println("Graceful shutdown complete.")
+
+	r := gin.Default()
+	r.GET("/ping", func(c *gin.Context) {
+		c.JSON(200, gin.H{
+			user
+		})
+	})
+	r.Run()
 }
