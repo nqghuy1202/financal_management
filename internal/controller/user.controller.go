@@ -2,8 +2,6 @@ package controller
 
 import (
 	"financal_management/internal/services"
-
-	"github.com/gin-gonic/gin"
 )
 
 type UserController struct {
@@ -22,8 +20,6 @@ func NewUserController() *UserController {
 // controller -> service -> repo -> model -> database
 
 // user controller -> uc
-func (uc *UserController) GetUserByID(c *gin.Context) {
-	c.JSON(200, gin.H{
-		"message": uc.userService.GetInfoUserSerivce(),
-	})
+func (uc *UserController) GetUserByID() string {
+	return uc.userService.GetInfoUserSerivce()
 }

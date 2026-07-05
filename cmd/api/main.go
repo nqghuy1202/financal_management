@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"financal_management/internal/controller"
 	"log"
 	"net/http"
 	"os/signal"
@@ -58,7 +59,7 @@ func main() {
 	r := gin.Default()
 	r.GET("/ping", func(c *gin.Context) {
 		c.JSON(200, gin.H{
-			user
+			"name": controller.NewUserController().GetUserByID(),
 		})
 	})
 	r.Run()
