@@ -56,11 +56,15 @@ func main() {
 	// <-done
 	// log.Println("Graceful shutdown complete.")
 
+	// r := gin.Default()
+	// r.GET("/ping", func(c *gin.Context) {
+	// 	c.JSON(200, gin.H{
+	// 		"name": controller.NewUserController().GetUserByID(),
+	// 	})
+	// })
+	// r.Run()
+
 	r := gin.Default()
-	r.GET("/ping", func(c *gin.Context) {
-		c.JSON(200, gin.H{
-			"name": controller.NewUserController().GetUserByID(),
-		})
-	})
+	r.GET("/info", controller.NewUserController().GetResponseStatus)
 	r.Run()
 }
