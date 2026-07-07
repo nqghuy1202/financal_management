@@ -1,0 +1,14 @@
+server:
+  port: 8080
+databases:
+  - user: admin
+    password: admin
+    host: localhost
+    dbName: financalManagement
+  - user: management
+    password: management
+    host: localhost
+    dbName: financal
+security:
+  jwt: 
+    key: abc123
