@@ -2,14 +2,11 @@ package main
 
 import (
 	"context"
-	"financal_management/internal/controller"
 	"log"
 	"net/http"
 	"os/signal"
 	"syscall"
 	"time"
-
-	"github.com/gin-gonic/gin"
 )
 
 func gracefulShutdown(apiServer *http.Server, done chan bool) {
@@ -64,7 +61,7 @@ func main() {
 	// })
 	// r.Run()
 
-	r := gin.Default()
-	r.GET("/info", controller.NewUserController().GetResponseStatus)
-	r.Run()
+	// r := gin.Default()
+	// r.GET("/info", controller.NewUserController().GetResponseStatus)
+	// r.Run()
 }
