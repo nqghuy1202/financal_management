@@ -3,6 +3,8 @@ package controller
 import (
 	"financal_management/internal/pkg/response"
 	"financal_management/internal/services"
+	"fmt"
+	"net/http"
 
 	"github.com/gin-gonic/gin"
 )
@@ -28,13 +30,14 @@ func (uc *UserController) GetUserByID() string {
 }
 
 func (uc *UserController) GetResponseStatus(c *gin.Context) {
-	// c.JSON(http.StatusOK, response.ResponseData{
-	// 	Code:    20001,
-	// 	Message: "Success",
-	// 	Data:    []string{"Gia Huy", "12/02/2003", "TP.Hồ Chí Minh"},
-	// })
+	fmt.Println("My handle -> OK")
+	c.JSON(http.StatusOK, response.ResponseData{
+		Code:    20001,
+		Message: "Success",
+		Data:    []string{"Gia Huy", "12/02/2003", "TP.Hồ Chí Minh"},
+	})
 
 	// response.SuccessResponse(c, 20001, []string{"Gia Huy", "12/02/2003", "TP.Hồ Chí Minh"})
 
-	response.ErrResponse(c, 20003, "No need!!!")
+	// response.ErrResponse(c, 20003, "No need!!!")
 }

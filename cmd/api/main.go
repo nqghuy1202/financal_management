@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"financal_management/internal/routers"
 	"log"
 	"net/http"
 	"os/signal"
@@ -64,4 +65,8 @@ func main() {
 	// r := gin.Default()
 	// r.GET("/info", controller.NewUserController().GetResponseStatus)
 	// r.Run()
+
+	r := routers.NewRouter()
+
+	r.Run()
 }
