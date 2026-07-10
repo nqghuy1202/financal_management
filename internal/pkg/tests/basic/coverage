@@ -1,0 +1,5 @@
+mode: set
+financal_management/internal/pkg/tests/basic/main.go:5.26,7.2 1 0
+financal_management/internal/pkg/tests/basic/main.go:9.27,10.12 1 1
+financal_management/internal/pkg/tests/basic/main.go:10.12,12.3 1 0
+financal_management/internal/pkg/tests/basic/main.go:13.2,13.16 1 1
