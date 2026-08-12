@@ -96,6 +96,31 @@ Handlers report failures with `_ = c.Error(err)` and return; the
 `response.AsAppError` funnels any unrecognised error into a 500 so internal
 detail never reaches a client.
 
+### Auth tokens
+
+Two tokens with different jobs, and the split is deliberate.
+
+The **access token** is a JWT valid for 15 minutes, returned in the
+response body. A JWT cannot be revoked, so it is kept short-lived; the
+frontend holds it in memory and never writes it to disk.
+
+The **refresh token** is a random string in Redis, returned only as an
+**HttpOnly cookie** set by the Go API. It is deliberately absent from
+`sessionResponse` — returning it in the body too would let JavaScript read
+it and defeat the cookie. `refresh` and `logout` read it from the cookie
+and take no request body.
+
+The API sets the cookie directly rather than proxying through Next.js:
+`localhost:3000` and `localhost:8080` are the same site (site is the
+domain, ports do not count), so `SameSite=Lax` works with no extra layer.
+The cookie's `Path` is scoped to `/api/v1/auth`, so it is not attached to
+ordinary API calls. Startup rejects `sameSite=none` without `secure`,
+because browsers drop such a cookie silently and login would fail in
+production with nothing to trace.
+
+`ConsumeRefresh` uses Redis `GETDEL`, so a refresh token works exactly
+once and two concurrent requests cannot both redeem it.
+
 ### Middleware order
 
 Set in `internal/initialize/router.go`. `RequireAuth` must run **before**
