@@ -51,6 +51,14 @@ jwt:
   accessTokenTTL: 15m
   refreshTokenTTL: 168h # 7 ngày
 
+cookie:
+  name: refresh_token
+  # Chỉ gửi cookie khi gọi endpoint auth, không đính vào mọi request.
+  path: /api/v1/auth
+  domain: ""
+  secure: false
+  sameSite: lax
+
 rateLimit:
   # Hạn mức toàn cục theo IP, áp cho mọi request kể cả chưa đăng nhập.
   ip:

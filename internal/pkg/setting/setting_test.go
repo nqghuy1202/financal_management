@@ -22,6 +22,7 @@ func validConfig() Config {
 			AccessTokenTTL:  15 * time.Minute,
 			RefreshTokenTTL: 168 * time.Hour,
 		},
+		Cookie: CookieSetting{Name: "refresh_token", Path: "/api/v1/auth", SameSite: "lax"},
 		RateLimit: RateLimitSetting{
 			IP:    RateLimitRule{Enabled: true, Capacity: 100, RefillPerSecond: 10},
 			User:  RateLimitRule{Enabled: true, Capacity: 300, RefillPerSecond: 30},
@@ -74,6 +75,18 @@ func TestConfigValidate_BatLoi(t *testing.T) {
 			name:    "refresh TTL ngắn hơn access TTL",
 			modify:  func(c *Config) { c.JWT.RefreshTokenTTL = time.Minute },
 			wantMsg: "refreshTokenTTL",
+		},
+		{
+			name:    "cookie.sameSite không hợp lệ",
+			modify:  func(c *Config) { c.Cookie.SameSite = "maybe" },
+			wantMsg: "cookie.sameSite",
+		},
+		{
+			// Trình duyệt từ chối cookie SameSite=None mà không có Secure,
+			// nên phải chặn ngay lúc khởi động.
+			name:    "sameSite=none nhưng không bật secure",
+			modify:  func(c *Config) { c.Cookie.SameSite = "none"; c.Cookie.Secure = false },
+			wantMsg: "cookie.secure=true",
 		},
 		{
 			name:    "hạn mức ip bật nhưng capacity bằng 0",

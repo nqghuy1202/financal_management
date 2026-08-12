@@ -15,6 +15,7 @@ type Config struct {
 	Redis     RedisSetting     `mapstructure:"redis"`
 	Kafka     KafkaSetting     `mapstructure:"kafka"`
 	JWT       JWTSetting       `mapstructure:"jwt"`
+	Cookie    CookieSetting    `mapstructure:"cookie"`
 	RateLimit RateLimitSetting `mapstructure:"rateLimit"`
 }
 
@@ -96,6 +97,32 @@ type JWTSetting struct {
 	RefreshTokenTTL time.Duration `mapstructure:"refreshTokenTTL"`
 }
 
+// CookieSetting cấu hình cookie chứa refresh token.
+//
+// Refresh token nằm trong cookie HttpOnly thay vì trả về trong body JSON.
+// Lý do: JavaScript không đọc được cookie HttpOnly, nên nếu trang bị tấn
+// công XSS thì kẻ tấn công không lấy được token mang đi dùng nơi khác.
+// Access token thì ngược lại — nó chỉ sống 15 phút và frontend giữ trong
+// bộ nhớ, không ghi xuống đĩa.
+type CookieSetting struct {
+	Name string `mapstructure:"name"`
+	// Path giới hạn cookie chỉ được gửi kèm khi gọi các endpoint auth.
+	// Đặt "/api/v1/auth" thì mọi request khác không mang theo token này.
+	Path   string `mapstructure:"path"`
+	Domain string `mapstructure:"domain"`
+	// Secure bắt buộc bật ở production; trình duyệt chỉ gửi cookie qua HTTPS.
+	Secure bool `mapstructure:"secure"`
+	// SameSite: lax | strict | none.
+	//
+	// Local dùng "lax": frontend localhost:3000 và API localhost:8080 khác
+	// cổng nhưng vẫn được coi là CÙNG site (site tính theo tên miền, không
+	// tính cổng), nên cookie được gửi bình thường.
+	//
+	// Khi deploy frontend và API lên hai tên miền khác nhau thì phải đổi
+	// sang "none", và khi đó trình duyệt bắt buộc Secure = true.
+	SameSite string `mapstructure:"sameSite"`
+}
+
 // RateLimitSetting gom các hạn mức cho từng nhóm request.
 //
 // Tách làm ba vì mỗi nhóm có mục tiêu bảo vệ khác nhau, không thể dùng
@@ -175,6 +202,22 @@ func (c *Config) Validate() error {
 	if c.JWT.RefreshTokenTTL <= c.JWT.AccessTokenTTL {
 		errs = append(errs, errors.New("jwt.refreshTokenTTL phải lớn hơn accessTokenTTL"))
 	}
+	if c.Cookie.Name == "" {
+		errs = append(errs, errors.New("cookie.name không được rỗng"))
+	}
+	switch c.Cookie.SameSite {
+	case "lax", "strict":
+	case "none":
+		// Trình duyệt từ chối cookie SameSite=None mà không có Secure.
+		// Bắt lỗi ngay lúc khởi động thay vì để đăng nhập im lặng hỏng
+		// trên production.
+		if !c.Cookie.Secure {
+			errs = append(errs, errors.New("cookie.sameSite=none bắt buộc cookie.secure=true"))
+		}
+	default:
+		errs = append(errs, fmt.Errorf("cookie.sameSite phải là lax|strict|none, đang là %q", c.Cookie.SameSite))
+	}
+
 	errs = append(errs,
 		c.RateLimit.IP.Validate("ip"),
 		c.RateLimit.User.Validate("user"),
