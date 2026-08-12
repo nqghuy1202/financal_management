@@ -18,16 +18,29 @@ sql:
         emit_empty_slices: true # trả về [] thay vì nil cho truy vấn :many
         emit_pointers_for_null_types: true # cột NULL -> *T thay vì pgtype
 
+        # Lưu ý về cú pháp override, sqlc rất dễ gây lỗi ở đây:
+        #
+        #  - `type` chỉ ghi TÊN KIỂU, `package` ghi tên package. Nếu viết
+        #    gộp thành type: "uuid.UUID" kèm import thì sqlc ghép lại
+        #    thành uuid.uuid.UUID và code sinh ra không biên dịch được.
+        #  - Hai override của cùng một kiểu (bản NOT NULL và bản NULL)
+        #    phải khai báo import theo CÙNG một cú pháp. Nếu một bên dùng
+        #    dạng rút gọn còn bên kia dùng dạng đầy đủ, sqlc coi là hai
+        #    import khác nhau và sinh ra hai dòng import trùng tên.
+        #  - sqlc KHÔNG báo lỗi khi db_type viết sai, nó lặng lẽ bỏ qua.
+        #    Sau mỗi lần sinh code phải mở models.go kiểm tra lại kiểu.
         overrides:
           # Mặc định sqlc ánh xạ uuid sang pgtype.UUID, khá cồng kềnh.
           # Dùng thẳng google/uuid cho đồng bộ với chỗ sinh UUIDv7.
           - db_type: "uuid"
-            go_type: "github.com/google/uuid.UUID"
+            go_type: &uuid_type
+              import: "github.com/google/uuid"
+              package: "uuid"
+              type: "UUID"
           - db_type: "uuid"
             nullable: true
             go_type:
-              type: "uuid.UUID"
-              import: "github.com/google/uuid"
+              <<: *uuid_type
               pointer: true
 
           # citext hành xử như text, chỉ khác là so sánh không phân biệt
@@ -40,6 +53,9 @@ sql:
           # nên tầng nghiệp vụ phải kiểm tra .Valid ở khắp nơi dù cột
           # không bao giờ NULL. Ép về time.Time cho cột NOT NULL và
           # *time.Time cho cột cho phép NULL.
+          #
+          # Chú ý: db_type ở đây là "timestamptz" KHÔNG có tiền tố
+          # pg_catalog, trong khi numeric bên dưới thì lại CẦN tiền tố đó.
           - db_type: "timestamptz"
             go_type: "time.Time"
           - db_type: "timestamptz"
@@ -51,10 +67,12 @@ sql:
           # Tiền tệ: NUMERIC phải ra decimal.Decimal, tuyệt đối không được
           # để rơi về float64.
           - db_type: "pg_catalog.numeric"
-            go_type: "github.com/shopspring/decimal.Decimal"
+            go_type: &decimal_type
+              import: "github.com/shopspring/decimal"
+              package: "decimal"
+              type: "Decimal"
           - db_type: "pg_catalog.numeric"
             nullable: true
             go_type:
-              type: "decimal.Decimal"
-              import: "github.com/shopspring/decimal"
+              <<: *decimal_type
               pointer: true

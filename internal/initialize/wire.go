@@ -27,9 +27,13 @@ func buildDeps(db *pgxpool.Pool, rdb *redis.Client) routers.Deps {
 	userRepo := repo.NewUserRepo(db)
 	authService := services.NewAuthService(userRepo, tokenManager)
 
+	accountRepo := repo.NewAccountRepo(db)
+	accountService := services.NewAccountService(accountRepo)
+
 	return routers.Deps{
-		Health: controller.NewHealthController(db, rdb),
-		Auth:   controller.NewAuthController(authService),
+		Health:  controller.NewHealthController(db, rdb),
+		Auth:    controller.NewAuthController(authService),
+		Account: controller.NewAccountController(accountService),
 
 		RequireAuth: middlewares.RequireAuth(tokenManager),
 		LoginRateLimit: middlewares.RateLimit(

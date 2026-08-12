@@ -7,8 +7,50 @@ package sqlc
 import (
 	"time"
 
-	"github.com/google/uuid"
+	uuid "github.com/google/uuid"
+	decimal "github.com/shopspring/decimal"
 )
+
+type Account struct {
+	ID        uuid.UUID
+	UserID    uuid.UUID
+	Name      string
+	Type      string
+	Currency  string
+	Balance   decimal.Decimal
+	Icon      string
+	DeletedAt *time.Time
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
+
+type Category struct {
+	ID        uuid.UUID
+	UserID    *uuid.UUID
+	Name      string
+	Type      string
+	Icon      string
+	Color     string
+	DeletedAt *time.Time
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
+
+type Transaction struct {
+	ID               uuid.UUID
+	UserID           uuid.UUID
+	AccountID        uuid.UUID
+	CounterAccountID *uuid.UUID
+	CategoryID       *uuid.UUID
+	Type             string
+	Amount           decimal.Decimal
+	Currency         string
+	Note             string
+	OccurredAt       time.Time
+	DeletedAt        *time.Time
+	CreatedAt        time.Time
+	UpdatedAt        time.Time
+}
 
 type User struct {
 	ID              uuid.UUID

@@ -104,6 +104,12 @@ hôm qua thì báo cáo tháng phải tính vào hôm qua.
 
 ### `categories` (Phase 2)
 
+Danh mục **phẳng, không phân cấp**. Bản thiết kế đầu có cột `parent_id`
+cho danh mục con, nhưng đã bỏ: truy vấn cây cần `WITH RECURSIVE`, làm mọi
+câu lệnh lọc và báo cáo phức tạp hơn hẳn trong khi giá trị thêm cho một
+app chi tiêu cá nhân là nhỏ. Nếu sau này cần, thêm cột là một migration
+đơn giản.
+
 `user_id` cho phép `NULL`: `NULL` là danh mục hệ thống seed sẵn, có giá
 trị là danh mục người dùng tự tạo. Vì `NULL` không so sánh bằng nhau
 được trong ràng buộc UNIQUE, cần hai partial index riêng:

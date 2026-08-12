@@ -5,6 +5,7 @@ import (
 	"errors"
 	"strings"
 
+	"financal_management/internal/model"
 	"financal_management/internal/pkg/password"
 	"financal_management/internal/pkg/response"
 	"financal_management/internal/pkg/token"
@@ -45,6 +46,7 @@ type Session struct {
 // Nếu không làm vậy, email không tồn tại sẽ trả lời nhanh hơn hẳn (vì bỏ
 // qua bcrypt), và kẻ tấn công chỉ cần đo thời gian là biết email nào đã
 // đăng ký trong hệ thống.
+//
 // Đây là chuỗi bcrypt thật (cost 12) của một mật khẩu không ai biết, nên
 // phép so sánh tốn đúng bằng thời gian so sánh một mật khẩu thật.
 const dummyHash = "$2a$12$ii1KS/CFkx/sOl9VxNJX1.GJnFEBQmViOuM1vfa9/NzrOUDbotUaG"
@@ -78,7 +80,7 @@ func (s *AuthService) Register(ctx context.Context, in RegisterInput) (*Session,
 		Email:        email,
 		PasswordHash: hashed,
 		FullName:     strings.TrimSpace(in.FullName),
-		BaseCurrency: "VND",
+		BaseCurrency: model.DefaultCurrency,
 	})
 	if err != nil {
 		return nil, response.Wrap(response.CodeDatabaseError, err)
