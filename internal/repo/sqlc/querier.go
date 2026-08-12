@@ -66,6 +66,38 @@ type Querier interface {
 	// chí đó.
 	ListTransactions(ctx context.Context, arg ListTransactionsParams) ([]Transaction, error)
 	MarkEmailVerified(ctx context.Context, id uuid.UUID) error
+	// Tổng tiền theo từng danh mục trong một kỳ.
+	//
+	// LEFT JOIN chứ không phải INNER JOIN: giao dịch ghi nhanh không có danh
+	// mục vẫn phải xuất hiện trong báo cáo, gom vào nhóm "Chưa phân loại".
+	// Dùng INNER JOIN sẽ âm thầm bỏ sót chúng và tổng của báo cáo sẽ nhỏ hơn
+	// tổng chi thực tế.
+	ReportByCategory(ctx context.Context, arg ReportByCategoryParams) ([]ReportByCategoryRow, error)
+	// Thu và chi gom theo từng tháng.
+	//
+	// Phải đổi về múi giờ địa phương TRƯỚC khi cắt theo tháng. occurred_at
+	// lưu theo UTC, nên một khoản chi lúc 06:00 ngày 01/08 giờ Việt Nam
+	// tương ứng 23:00 ngày 31/07 UTC — nếu gom theo UTC nó sẽ rơi nhầm vào
+	// tháng 7.
+	//
+	// Chỉ trả về tháng CÓ giao dịch; tháng trống được điền ở tầng service để
+	// biểu đồ không bị đứt quãng.
+	ReportCashFlow(ctx context.Context, arg ReportCashFlowParams) ([]ReportCashFlowRow, error)
+	// Toàn bộ báo cáo tổng hợp theo cột occurred_at (thời điểm tiền thực sự
+	// thu/chi), KHÔNG theo created_at. Hôm nay nhập bữa ăn của hôm qua thì
+	// khoản đó phải nằm trong báo cáo của hôm qua.
+	//
+	// Khoảng thời gian luôn là nửa mở [from, to): lấy >= from và < to. Nhờ
+	// vậy hai kỳ liền nhau không bao giờ đếm trùng một giao dịch nằm đúng
+	// ranh giới.
+	// Tổng thu, tổng chi và số giao dịch trong một kỳ.
+	//
+	// FILTER (WHERE ...) là cách Postgres gộp nhiều phép tính có điều kiện
+	// khác nhau vào MỘT lần quét bảng. Nếu tách thành hai câu SUM riêng thì
+	// phải quét bảng hai lần cho cùng một khoảng dữ liệu.
+	//
+	// COALESCE để kỳ không có giao dịch nào trả về 0 thay vì NULL.
+	ReportSummary(ctx context.Context, arg ReportSummaryParams) (ReportSummaryRow, error)
 	// Xoá mềm để các giao dịch cũ vẫn tham chiếu được tới ví này.
 	SoftDeleteAccount(ctx context.Context, arg SoftDeleteAccountParams) (Account, error)
 	SoftDeleteCategory(ctx context.Context, arg SoftDeleteCategoryParams) (Category, error)

@@ -27,6 +27,7 @@ type Deps struct {
 	Account     *controller.AccountController
 	Category    *controller.CategoryController
 	Transaction *controller.TransactionController
+	Report      *controller.ReportController
 
 	// Middleware được dựng sẵn ở initialize rồi truyền vào, vì chúng cần
 	// dependency (Redis, token manager) mà package này không nên biết tới.
@@ -47,8 +48,8 @@ func RegisterRoutes(r *gin.Engine, d Deps) {
 	registerAccountRoutes(v1, d)
 	registerCategoryRoutes(v1, d)
 	registerTransactionRoutes(v1, d)
+	registerReportRoutes(v1, d)
 
 	// Các module sẽ được thêm ở các phase sau:
-	//   registerReportRoutes(v1, d)         — Phase 4
 	//   registerBudgetRoutes(v1, d)         — Phase 5
 }

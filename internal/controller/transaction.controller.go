@@ -353,17 +353,23 @@ func optionalUUIDQuery(c *gin.Context, name string) (*uuid.UUID, error) {
 
 // optionalTimeQuery đọc một tham số thời gian tuỳ chọn.
 //
-// Chấp nhận cả dạng đầy đủ RFC3339 ("2026-08-12T00:00:00Z") lẫn dạng chỉ
-// có ngày ("2026-08-12") cho tiện gõ tay khi thử API.
+// Chấp nhận cả dạng đầy đủ RFC3339 ("2026-08-12T00:00:00+07:00") lẫn dạng
+// chỉ có ngày ("2026-08-12").
+//
+// Dạng chỉ có ngày được hiểu theo MÚI GIỜ ỨNG DỤNG, không phải UTC. Khi
+// người dùng lọc "từ 2026-08-01" họ muốn nói 00:00 giờ Việt Nam. Nếu hiểu
+// là 00:00 UTC thì mọi giao dịch từ 00:00 tới 07:00 sáng ngày đầu kỳ sẽ
+// bị đẩy sang kỳ trước — số liệu báo cáo sai mà không có dấu hiệu gì.
 func optionalTimeQuery(c *gin.Context, name string) (*time.Time, error) {
 	raw := c.Query(name)
 	if raw == "" {
 		return nil, nil
 	}
+	// RFC3339 tự mang múi giờ nên dùng nguyên.
 	if t, err := time.Parse(time.RFC3339, raw); err == nil {
 		return &t, nil
 	}
-	if t, err := time.Parse(time.DateOnly, raw); err == nil {
+	if t, err := time.ParseInLocation(time.DateOnly, raw, model.AppLocation()); err == nil {
 		return &t, nil
 	}
 	return nil, response.Newf(response.CodeInvalidParam,

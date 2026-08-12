@@ -64,6 +64,16 @@ sql:
               type: "time.Time"
               pointer: true
 
+          # Kiểu timestamp (không có múi giờ) sinh ra từ date_trunc trong
+          # các truy vấn báo cáo. Cũng ép về time.Time cho đồng nhất.
+          - db_type: "pg_catalog.timestamp"
+            go_type: "time.Time"
+          - db_type: "pg_catalog.timestamp"
+            nullable: true
+            go_type:
+              type: "time.Time"
+              pointer: true
+
           # Tiền tệ: NUMERIC phải ra decimal.Decimal, tuyệt đối không được
           # để rơi về float64.
           - db_type: "pg_catalog.numeric"
