@@ -17,12 +17,19 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// Deps gom toàn bộ controller mà tầng route cần.
+// Deps gom mọi thứ mà tầng route cần.
 //
 // Truyền tường minh thay vì đọc biến toàn cục, để test có thể dựng router
 // với controller giả mà không cần database thật.
 type Deps struct {
 	Health *controller.HealthController
+	Auth   *controller.AuthController
+
+	// Middleware được dựng sẵn ở initialize rồi truyền vào, vì chúng cần
+	// dependency (Redis, token manager) mà package này không nên biết tới.
+	RequireAuth    gin.HandlerFunc
+	LoginRateLimit gin.HandlerFunc
+	UserRateLimit  gin.HandlerFunc
 }
 
 // RegisterRoutes gắn toàn bộ route của ứng dụng vào engine.
@@ -33,12 +40,12 @@ func RegisterRoutes(r *gin.Engine, d Deps) {
 	// không phá vỡ client cũ.
 	v1 := r.Group("/api/v1")
 
+	registerAuthRoutes(v1, d)
+
 	// Các module sẽ được thêm ở các phase sau:
-	//   registerAuthRoutes(v1, d.Auth)              — Phase 1
-	//   registerAccountRoutes(v1, d.Account)        — Phase 2
-	//   registerCategoryRoutes(v1, d.Category)      — Phase 2
-	//   registerTransactionRoutes(v1, d.Transaction)— Phase 2
-	//   registerReportRoutes(v1, d.Report)          — Phase 4
-	//   registerBudgetRoutes(v1, d.Budget)          — Phase 5
-	_ = v1
+	//   registerAccountRoutes(v1, d)        — Phase 2
+	//   registerCategoryRoutes(v1, d)       — Phase 2
+	//   registerTransactionRoutes(v1, d)    — Phase 2
+	//   registerReportRoutes(v1, d)         — Phase 4
+	//   registerBudgetRoutes(v1, d)         — Phase 5
 }

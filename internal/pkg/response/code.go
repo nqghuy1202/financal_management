@@ -56,9 +56,12 @@ var catalog = map[int]definition{
 	CodeValidationFailed: {http.StatusBadRequest, "Dữ liệu gửi lên không hợp lệ"},
 	CodeInvalidParam:     {http.StatusBadRequest, "Tham số không hợp lệ"},
 
-	CodeUnauthorized:       {http.StatusUnauthorized, "Chưa xác thực"},
-	CodeTokenMissing:       {http.StatusUnauthorized, "Thiếu access token"},
-	CodeTokenInvalid:       {http.StatusUnauthorized, "Access token không hợp lệ"},
+	CodeUnauthorized: {http.StatusUnauthorized, "Chưa xác thực"},
+	CodeTokenMissing: {http.StatusUnauthorized, "Thiếu access token"},
+	// Thông báo để chung chung vì mã này dùng cho cả access token lẫn
+	// refresh token — ghi rõ "access token" sẽ sai ngữ cảnh khi client
+	// gửi refresh token đã dùng rồi.
+	CodeTokenInvalid:       {http.StatusUnauthorized, "Token không hợp lệ hoặc đã được sử dụng"},
 	CodeTokenExpired:       {http.StatusUnauthorized, "Access token đã hết hạn"},
 	CodeCredentialsInvalid: {http.StatusUnauthorized, "Email hoặc mật khẩu không đúng"},
 
