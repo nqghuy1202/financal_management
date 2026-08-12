@@ -1,0 +1,60 @@
+version: "2"
+
+sql:
+  - engine: postgresql
+    # sqlc đọc migration để biết schema, nên không bao giờ lệch giữa
+    # code Go và cấu trúc bảng thật: đổi cột mà quên sửa query thì sinh
+    # code sẽ báo lỗi ngay, không đợi tới lúc chạy.
+    schema: migrations
+    queries: internal/repo/queries
+
+    gen:
+      go:
+        package: sqlc
+        out: internal/repo/sqlc
+        sql_package: pgx/v5
+
+        emit_interface: true # sinh sẵn interface Querier để mock trong test
+        emit_empty_slices: true # trả về [] thay vì nil cho truy vấn :many
+        emit_pointers_for_null_types: true # cột NULL -> *T thay vì pgtype
+
+        overrides:
+          # Mặc định sqlc ánh xạ uuid sang pgtype.UUID, khá cồng kềnh.
+          # Dùng thẳng google/uuid cho đồng bộ với chỗ sinh UUIDv7.
+          - db_type: "uuid"
+            go_type: "github.com/google/uuid.UUID"
+          - db_type: "uuid"
+            nullable: true
+            go_type:
+              type: "uuid.UUID"
+              import: "github.com/google/uuid"
+              pointer: true
+
+          # citext hành xử như text, chỉ khác là so sánh không phân biệt
+          # hoa thường — phía Go vẫn chỉ là string.
+          - db_type: "citext"
+            go_type: "string"
+
+          # Với pgx/v5, mặc định sqlc sinh pgtype.Timestamptz cho mọi cột
+          # thời gian, kể cả cột NOT NULL. Kiểu đó là struct có cờ Valid
+          # nên tầng nghiệp vụ phải kiểm tra .Valid ở khắp nơi dù cột
+          # không bao giờ NULL. Ép về time.Time cho cột NOT NULL và
+          # *time.Time cho cột cho phép NULL.
+          - db_type: "timestamptz"
+            go_type: "time.Time"
+          - db_type: "timestamptz"
+            nullable: true
+            go_type:
+              type: "time.Time"
+              pointer: true
+
+          # Tiền tệ: NUMERIC phải ra decimal.Decimal, tuyệt đối không được
+          # để rơi về float64.
+          - db_type: "pg_catalog.numeric"
+            go_type: "github.com/shopspring/decimal.Decimal"
+          - db_type: "pg_catalog.numeric"
+            nullable: true
+            go_type:
+              type: "decimal.Decimal"
+              import: "github.com/shopspring/decimal"
+              pointer: true

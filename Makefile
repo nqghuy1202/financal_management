@@ -34,6 +34,46 @@ ps: ## Xem trạng thái các container
 	docker compose ps
 
 # ---------------------------------------------------------------------
+# Database
+# ---------------------------------------------------------------------
+# goose đọc GOOSE_DRIVER / GOOSE_DBSTRING / GOOSE_MIGRATION_DIR từ .env
+GOOSE := goose
+
+.PHONY: tools
+tools: ## Cài goose và sqlc
+	go install github.com/pressly/goose/v3/cmd/goose@latest
+	go install github.com/sqlc-dev/sqlc/cmd/sqlc@latest
+
+.PHONY: migrate-up
+migrate-up: ## Chạy toàn bộ migration còn thiếu
+	$(GOOSE) up
+
+.PHONY: migrate-down
+migrate-down: ## Lùi lại một migration
+	$(GOOSE) down
+
+.PHONY: migrate-status
+migrate-status: ## Xem migration nào đã chạy
+	$(GOOSE) status
+
+.PHONY: migrate-reset
+migrate-reset: ## Lùi toàn bộ migration (XOÁ HẾT dữ liệu)
+	$(GOOSE) reset
+
+.PHONY: migrate-create
+migrate-create: ## Tạo migration mới: make migrate-create name=create_accounts
+	$(GOOSE) -s create $(name) sql
+
+.PHONY: sqlc
+sqlc: ## Sinh lại code truy vấn từ SQL
+	sqlc generate
+
+.PHONY: sqlc-verify
+sqlc-verify: ## Kiểm tra query có khớp schema không (không ghi file)
+	sqlc vet
+	sqlc diff
+
+# ---------------------------------------------------------------------
 # Ứng dụng
 # ---------------------------------------------------------------------
 .PHONY: build
