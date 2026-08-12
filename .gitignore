@@ -37,8 +37,9 @@ config/local.override.yaml
 .DS_Store
 Thumbs.db
 
-# Frontend (Phase 6)
+# Frontend
 web/node_modules/
 web/.next/
 web/out/
 web/.env*.local
+web/next-env.d.ts
