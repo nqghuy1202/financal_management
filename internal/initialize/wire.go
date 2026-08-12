@@ -33,11 +33,15 @@ func buildDeps(db *pgxpool.Pool, rdb *redis.Client) routers.Deps {
 	categoryRepo := repo.NewCategoryRepo(db)
 	categoryService := services.NewCategoryService(categoryRepo)
 
+	transactionRepo := repo.NewTransactionRepo(db)
+	transactionService := services.NewTransactionService(transactionRepo, accountRepo, categoryRepo)
+
 	return routers.Deps{
-		Health:   controller.NewHealthController(db, rdb),
-		Auth:     controller.NewAuthController(authService),
-		Account:  controller.NewAccountController(accountService),
-		Category: controller.NewCategoryController(categoryService),
+		Health:      controller.NewHealthController(db, rdb),
+		Auth:        controller.NewAuthController(authService),
+		Account:     controller.NewAccountController(accountService),
+		Category:    controller.NewCategoryController(categoryService),
+		Transaction: controller.NewTransactionController(transactionService),
 
 		RequireAuth: middlewares.RequireAuth(tokenManager),
 		LoginRateLimit: middlewares.RateLimit(

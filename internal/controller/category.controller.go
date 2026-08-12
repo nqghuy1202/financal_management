@@ -79,7 +79,7 @@ func (cc *CategoryController) List(c *gin.Context) {
 		items = append(items, toCategoryResponse(cat))
 	}
 
-	response.Success(c, gin.H{"items": items})
+	response.Success(c, gin.H{keyItems: items})
 }
 
 // Get lấy chi tiết một danh mục. GET /api/v1/categories/:id

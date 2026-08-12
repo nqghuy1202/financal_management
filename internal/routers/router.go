@@ -22,10 +22,11 @@ import (
 // Truyền tường minh thay vì đọc biến toàn cục, để test có thể dựng router
 // với controller giả mà không cần database thật.
 type Deps struct {
-	Health   *controller.HealthController
-	Auth     *controller.AuthController
-	Account  *controller.AccountController
-	Category *controller.CategoryController
+	Health      *controller.HealthController
+	Auth        *controller.AuthController
+	Account     *controller.AccountController
+	Category    *controller.CategoryController
+	Transaction *controller.TransactionController
 
 	// Middleware được dựng sẵn ở initialize rồi truyền vào, vì chúng cần
 	// dependency (Redis, token manager) mà package này không nên biết tới.
@@ -45,9 +46,9 @@ func RegisterRoutes(r *gin.Engine, d Deps) {
 	registerAuthRoutes(v1, d)
 	registerAccountRoutes(v1, d)
 	registerCategoryRoutes(v1, d)
+	registerTransactionRoutes(v1, d)
 
 	// Các module sẽ được thêm ở các phase sau:
-	//   registerTransactionRoutes(v1, d)    — Phase 2
 	//   registerReportRoutes(v1, d)         — Phase 4
 	//   registerBudgetRoutes(v1, d)         — Phase 5
 }

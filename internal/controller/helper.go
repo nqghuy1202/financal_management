@@ -8,8 +8,11 @@ import (
 	"github.com/google/uuid"
 )
 
-// keyMessage là khoá JSON cho các response chỉ trả về một lời nhắn.
-const keyMessage = "message"
+// Khoá JSON dùng lặp lại ở nhiều response.
+const (
+	keyMessage = "message" // response chỉ trả về một lời nhắn
+	keyItems   = "items"   // response trả về danh sách
+)
 
 // currentUserID lấy id người dùng đã đăng nhập từ context.
 //

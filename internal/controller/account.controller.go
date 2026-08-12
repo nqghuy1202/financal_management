@@ -103,7 +103,7 @@ func (ac *AccountController) List(c *gin.Context) {
 		items = append(items, toAccountResponse(a))
 	}
 
-	response.Success(c, gin.H{"items": items})
+	response.Success(c, gin.H{keyItems: items})
 }
 
 // Get lấy chi tiết một nguồn tiền. GET /api/v1/accounts/:id

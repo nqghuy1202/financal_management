@@ -11,6 +11,8 @@ import (
 )
 
 type Querier interface {
+	// Tổng số giao dịch khớp bộ lọc, để frontend hiện "có N kết quả".
+	CountTransactions(ctx context.Context, arg CountTransactionsParams) (int64, error)
 	// Dùng trước khi xoá: nguồn tiền còn giao dịch thì không cho xoá.
 	CountTransactionsByAccount(ctx context.Context, accountID *uuid.UUID) (int64, error)
 	// Dùng trước khi xoá: danh mục còn giao dịch thì không cho xoá, vì xoá đi
@@ -24,11 +26,13 @@ type Querier interface {
 	// nào có thể quên kiểm tra quyền sở hữu.
 	CreateAccount(ctx context.Context, arg CreateAccountParams) (Account, error)
 	CreateCategory(ctx context.Context, arg CreateCategoryParams) (Category, error)
+	CreateTransaction(ctx context.Context, arg CreateTransactionParams) (Transaction, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
 	EmailExists(ctx context.Context, email string) (bool, error)
 	GetAccount(ctx context.Context, arg GetAccountParams) (Account, error)
 	// Đọc được cả danh mục hệ thống lẫn danh mục của chính mình.
 	GetCategory(ctx context.Context, arg GetCategoryParams) (Category, error)
+	GetTransaction(ctx context.Context, arg GetTransactionParams) (Transaction, error)
 	// Cột email là citext nên so sánh ở đây tự động không phân biệt hoa
 	// thường, không cần lower() ở hai vế.
 	GetUserByEmail(ctx context.Context, email string) (User, error)
@@ -45,14 +49,32 @@ type Querier interface {
 	// bao giờ khớp — tự động được bảo vệ.
 	// Danh mục hệ thống hiện trước, sau đó xếp theo tên.
 	ListCategories(ctx context.Context, arg ListCategoriesParams) ([]Category, error)
+	//
+	// Phân trang bằng CON TRỎ chứ không dùng OFFSET.
+	//
+	// OFFSET có hai vấn đề: database vẫn phải đọc và bỏ đi toàn bộ số dòng
+	// được bỏ qua nên trang càng sau càng chậm; và nếu có giao dịch mới được
+	// thêm giữa hai lần gọi thì các trang sau bị lệch, người dùng thấy lặp
+	// hoặc mất bản ghi.
+	//
+	// Con trỏ ở đây là cặp (occurred_at, id). Cần cả hai vì nhiều giao dịch
+	// có thể trùng ngày; id là chốt chặn để thứ tự luôn xác định. Phép so
+	// sánh bộ (a, b) < (c, d) của Postgres so sánh theo thứ tự từ trái sang,
+	// đúng như thứ tự sắp xếp.
+	//
+	// Các tham số lọc dùng sqlc.narg: để NULL nghĩa là không lọc theo tiêu
+	// chí đó.
+	ListTransactions(ctx context.Context, arg ListTransactionsParams) ([]Transaction, error)
 	MarkEmailVerified(ctx context.Context, id uuid.UUID) error
 	// Xoá mềm để các giao dịch cũ vẫn tham chiếu được tới ví này.
 	SoftDeleteAccount(ctx context.Context, arg SoftDeleteAccountParams) (Account, error)
 	SoftDeleteCategory(ctx context.Context, arg SoftDeleteCategoryParams) (Category, error)
+	SoftDeleteTransaction(ctx context.Context, arg SoftDeleteTransactionParams) (Transaction, error)
 	UpdateAccount(ctx context.Context, arg UpdateAccountParams) (Account, error)
 	// Chỉ sửa được danh mục của chính mình: danh mục hệ thống có user_id
 	// NULL nên điều kiện dưới đây không bao giờ khớp.
 	UpdateCategory(ctx context.Context, arg UpdateCategoryParams) (Category, error)
+	UpdateTransaction(ctx context.Context, arg UpdateTransactionParams) (Transaction, error)
 	UpdateUserPassword(ctx context.Context, arg UpdateUserPasswordParams) error
 	UpdateUserProfile(ctx context.Context, arg UpdateUserProfileParams) (User, error)
 }
