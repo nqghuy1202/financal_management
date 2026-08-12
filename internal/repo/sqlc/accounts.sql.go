@@ -9,17 +9,16 @@ import (
 	"context"
 
 	uuid "github.com/google/uuid"
-	decimal "github.com/shopspring/decimal"
 )
 
 const countTransactionsByAccount = `-- name: CountTransactionsByAccount :one
 SELECT count(*) FROM transactions
-WHERE (account_id = $1 OR counter_account_id = $1)
+WHERE account_id = $1
   AND deleted_at IS NULL
 `
 
-// Dùng trước khi xoá ví: ví còn giao dịch thì cảnh báo người dùng.
-func (q *Queries) CountTransactionsByAccount(ctx context.Context, accountID uuid.UUID) (int64, error) {
+// Dùng trước khi xoá: nguồn tiền còn giao dịch thì không cho xoá.
+func (q *Queries) CountTransactionsByAccount(ctx context.Context, accountID *uuid.UUID) (int64, error) {
 	row := q.db.QueryRow(ctx, countTransactionsByAccount, accountID)
 	var count int64
 	err := row.Scan(&count)
@@ -28,19 +27,17 @@ func (q *Queries) CountTransactionsByAccount(ctx context.Context, accountID uuid
 
 const createAccount = `-- name: CreateAccount :one
 
-INSERT INTO accounts (id, user_id, name, type, currency, balance, icon)
-VALUES ($1, $2, $3, $4, $5, $6, $7)
-RETURNING id, user_id, name, type, currency, balance, icon, deleted_at, created_at, updated_at
+INSERT INTO accounts (id, user_id, name, type, icon)
+VALUES ($1, $2, $3, $4, $5)
+RETURNING id, user_id, name, type, icon, deleted_at, created_at, updated_at
 `
 
 type CreateAccountParams struct {
-	ID       uuid.UUID
-	UserID   uuid.UUID
-	Name     string
-	Type     string
-	Currency string
-	Balance  decimal.Decimal
-	Icon     string
+	ID     uuid.UUID
+	UserID uuid.UUID
+	Name   string
+	Type   string
+	Icon   string
 }
 
 // Mọi truy vấn ở đây đều có điều kiện user_id.
@@ -55,8 +52,6 @@ func (q *Queries) CreateAccount(ctx context.Context, arg CreateAccountParams) (A
 		arg.UserID,
 		arg.Name,
 		arg.Type,
-		arg.Currency,
-		arg.Balance,
 		arg.Icon,
 	)
 	var i Account
@@ -65,8 +60,6 @@ func (q *Queries) CreateAccount(ctx context.Context, arg CreateAccountParams) (A
 		&i.UserID,
 		&i.Name,
 		&i.Type,
-		&i.Currency,
-		&i.Balance,
 		&i.Icon,
 		&i.DeletedAt,
 		&i.CreatedAt,
@@ -76,7 +69,7 @@ func (q *Queries) CreateAccount(ctx context.Context, arg CreateAccountParams) (A
 }
 
 const getAccount = `-- name: GetAccount :one
-SELECT id, user_id, name, type, currency, balance, icon, deleted_at, created_at, updated_at FROM accounts
+SELECT id, user_id, name, type, icon, deleted_at, created_at, updated_at FROM accounts
 WHERE id = $1
   AND user_id = $2
   AND deleted_at IS NULL
@@ -95,44 +88,6 @@ func (q *Queries) GetAccount(ctx context.Context, arg GetAccountParams) (Account
 		&i.UserID,
 		&i.Name,
 		&i.Type,
-		&i.Currency,
-		&i.Balance,
-		&i.Icon,
-		&i.DeletedAt,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-	)
-	return i, err
-}
-
-const getAccountForUpdate = `-- name: GetAccountForUpdate :one
-SELECT id, user_id, name, type, currency, balance, icon, deleted_at, created_at, updated_at FROM accounts
-WHERE id = $1
-  AND user_id = $2
-  AND deleted_at IS NULL
-FOR UPDATE
-`
-
-type GetAccountForUpdateParams struct {
-	ID     uuid.UUID
-	UserID uuid.UUID
-}
-
-// Khoá dòng ví lại trước khi đổi số dư.
-//
-// FOR UPDATE khiến transaction khác muốn khoá cùng dòng phải xếp hàng
-// chờ. Nếu không có nó, hai giao dịch đồng thời trên cùng một ví có thể
-// cùng đọc số dư cũ rồi cùng ghi đè, làm mất một trong hai khoản tiền.
-func (q *Queries) GetAccountForUpdate(ctx context.Context, arg GetAccountForUpdateParams) (Account, error) {
-	row := q.db.QueryRow(ctx, getAccountForUpdate, arg.ID, arg.UserID)
-	var i Account
-	err := row.Scan(
-		&i.ID,
-		&i.UserID,
-		&i.Name,
-		&i.Type,
-		&i.Currency,
-		&i.Balance,
 		&i.Icon,
 		&i.DeletedAt,
 		&i.CreatedAt,
@@ -142,7 +97,7 @@ func (q *Queries) GetAccountForUpdate(ctx context.Context, arg GetAccountForUpda
 }
 
 const listAccounts = `-- name: ListAccounts :many
-SELECT id, user_id, name, type, currency, balance, icon, deleted_at, created_at, updated_at FROM accounts
+SELECT id, user_id, name, type, icon, deleted_at, created_at, updated_at FROM accounts
 WHERE user_id = $1
   AND deleted_at IS NULL
 ORDER BY created_at
@@ -162,8 +117,6 @@ func (q *Queries) ListAccounts(ctx context.Context, userID uuid.UUID) ([]Account
 			&i.UserID,
 			&i.Name,
 			&i.Type,
-			&i.Currency,
-			&i.Balance,
 			&i.Icon,
 			&i.DeletedAt,
 			&i.CreatedAt,
@@ -185,7 +138,7 @@ SET deleted_at = now()
 WHERE id = $1
   AND user_id = $2
   AND deleted_at IS NULL
-RETURNING id, user_id, name, type, currency, balance, icon, deleted_at, created_at, updated_at
+RETURNING id, user_id, name, type, icon, deleted_at, created_at, updated_at
 `
 
 type SoftDeleteAccountParams struct {
@@ -202,8 +155,6 @@ func (q *Queries) SoftDeleteAccount(ctx context.Context, arg SoftDeleteAccountPa
 		&i.UserID,
 		&i.Name,
 		&i.Type,
-		&i.Currency,
-		&i.Balance,
 		&i.Icon,
 		&i.DeletedAt,
 		&i.CreatedAt,
@@ -220,7 +171,7 @@ SET name = $1,
 WHERE id = $4
   AND user_id = $5
   AND deleted_at IS NULL
-RETURNING id, user_id, name, type, currency, balance, icon, deleted_at, created_at, updated_at
+RETURNING id, user_id, name, type, icon, deleted_at, created_at, updated_at
 `
 
 type UpdateAccountParams struct {
@@ -245,28 +196,10 @@ func (q *Queries) UpdateAccount(ctx context.Context, arg UpdateAccountParams) (A
 		&i.UserID,
 		&i.Name,
 		&i.Type,
-		&i.Currency,
-		&i.Balance,
 		&i.Icon,
 		&i.DeletedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
 	return i, err
-}
-
-const updateAccountBalance = `-- name: UpdateAccountBalance :exec
-UPDATE accounts
-SET balance = $1
-WHERE id = $2
-`
-
-type UpdateAccountBalanceParams struct {
-	Balance decimal.Decimal
-	ID      uuid.UUID
-}
-
-func (q *Queries) UpdateAccountBalance(ctx context.Context, arg UpdateAccountBalanceParams) error {
-	_, err := q.db.Exec(ctx, updateAccountBalance, arg.Balance, arg.ID)
-	return err
 }

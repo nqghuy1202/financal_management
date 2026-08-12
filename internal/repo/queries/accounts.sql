@@ -6,8 +6,8 @@
 -- nào có thể quên kiểm tra quyền sở hữu.
 
 -- name: CreateAccount :one
-INSERT INTO accounts (id, user_id, name, type, currency, balance, icon)
-VALUES (@id, @user_id, @name, @type, @currency, @balance, @icon)
+INSERT INTO accounts (id, user_id, name, type, icon)
+VALUES (@id, @user_id, @name, @type, @icon)
 RETURNING *;
 
 -- name: GetAccount :one
@@ -42,24 +42,7 @@ WHERE id = @id
 RETURNING *;
 
 -- name: CountTransactionsByAccount :one
--- Dùng trước khi xoá ví: ví còn giao dịch thì cảnh báo người dùng.
+-- Dùng trước khi xoá: nguồn tiền còn giao dịch thì không cho xoá.
 SELECT count(*) FROM transactions
-WHERE (account_id = @account_id OR counter_account_id = @account_id)
+WHERE account_id = @account_id
   AND deleted_at IS NULL;
-
--- name: GetAccountForUpdate :one
--- Khoá dòng ví lại trước khi đổi số dư.
---
--- FOR UPDATE khiến transaction khác muốn khoá cùng dòng phải xếp hàng
--- chờ. Nếu không có nó, hai giao dịch đồng thời trên cùng một ví có thể
--- cùng đọc số dư cũ rồi cùng ghi đè, làm mất một trong hai khoản tiền.
-SELECT * FROM accounts
-WHERE id = @id
-  AND user_id = @user_id
-  AND deleted_at IS NULL
-FOR UPDATE;
-
--- name: UpdateAccountBalance :exec
-UPDATE accounts
-SET balance = @balance
-WHERE id = @id;

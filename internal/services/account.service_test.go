@@ -11,7 +11,6 @@ import (
 	"financal_management/internal/repo/sqlc"
 
 	"github.com/google/uuid"
-	"github.com/shopspring/decimal"
 )
 
 // ---------------------------------------------------------------------
@@ -45,8 +44,7 @@ func (f *fakeAccountRepo) Create(_ context.Context, arg sqlc.CreateAccountParams
 
 	account := sqlc.Account{
 		ID: arg.ID, UserID: arg.UserID, Name: arg.Name, Type: arg.Type,
-		Currency: arg.Currency, Balance: arg.Balance, Icon: arg.Icon,
-		CreatedAt: time.Now(), UpdatedAt: time.Now(),
+		Icon: arg.Icon, CreatedAt: time.Now(), UpdatedAt: time.Now(),
 	}
 	f.items[account.ID] = account
 	return account, nil
@@ -131,25 +129,17 @@ func TestAccountCreate_ThanhCong(t *testing.T) {
 	userID := uuid.New()
 
 	account, err := svc.Create(context.Background(), CreateAccountInput{
-		UserID:         userID,
-		Name:           "  Tiền mặt  ",
-		Type:           "cash",
-		Currency:       "vnd",
-		InitialBalance: decimal.RequireFromString("500000"),
+		UserID: userID,
+		Name:   "  Tiền mặt  ",
+		Type:   "cash",
 	})
 	if err != nil {
 		t.Fatalf("Create lỗi: %v", err)
 	}
 
-	// Tên phải được cắt khoảng trắng thừa, mã tiền tệ phải viết hoa.
+	// Tên phải được cắt bỏ khoảng trắng thừa.
 	if account.Name != "Tiền mặt" {
 		t.Errorf("Name = %q, mong đợi %q", account.Name, "Tiền mặt")
-	}
-	if account.Currency != "VND" {
-		t.Errorf("Currency = %q, mong đợi VND", account.Currency)
-	}
-	if account.Balance.String() != "500000" {
-		t.Errorf("Balance = %s, mong đợi 500000", account.Balance)
 	}
 }
 
@@ -157,7 +147,7 @@ func TestAccountCreate_LoaiViKhongHopLe(t *testing.T) {
 	svc, _ := newAccountService()
 
 	_, err := svc.Create(context.Background(), CreateAccountInput{
-		UserID: uuid.New(), Name: "Ví lạ", Type: "bitcoin", Currency: "VND",
+		UserID: uuid.New(), Name: "Ví lạ", Type: "bitcoin",
 	})
 	wantCode(t, err, response.CodeValidationFailed)
 }
@@ -167,7 +157,7 @@ func TestAccountCreate_TrungTen(t *testing.T) {
 	ctx := context.Background()
 	userID := uuid.New()
 
-	in := CreateAccountInput{UserID: userID, Name: "Tiền mặt", Type: "cash", Currency: "VND"}
+	in := CreateAccountInput{UserID: userID, Name: "Tiền mặt", Type: "cash"}
 	if _, err := svc.Create(ctx, in); err != nil {
 		t.Fatalf("lần tạo đầu phải thành công: %v", err)
 	}
@@ -181,7 +171,7 @@ func TestAccountCreate_HaiNguoiDungTrungTenViVanDuoc(t *testing.T) {
 	svc, _ := newAccountService()
 	ctx := context.Background()
 
-	in := CreateAccountInput{UserID: uuid.New(), Name: "Tiền mặt", Type: "cash", Currency: "VND"}
+	in := CreateAccountInput{UserID: uuid.New(), Name: "Tiền mặt", Type: "cash"}
 	if _, err := svc.Create(ctx, in); err != nil {
 		t.Fatalf("người dùng 1 tạo ví lỗi: %v", err)
 	}
@@ -204,7 +194,7 @@ func TestAccountKhongTruyCapDuocViCuaNguoiKhac(t *testing.T) {
 	keLa := uuid.New()
 
 	account, err := svc.Create(ctx, CreateAccountInput{
-		UserID: chuSoHuu, Name: "Ví riêng", Type: "bank", Currency: "VND",
+		UserID: chuSoHuu, Name: "Ví riêng", Type: "bank",
 	})
 	if err != nil {
 		t.Fatalf("Create lỗi: %v", err)
@@ -244,7 +234,7 @@ func TestAccountDelete_ConGiaoDichThiKhongXoaDuoc(t *testing.T) {
 	userID := uuid.New()
 
 	account, err := svc.Create(ctx, CreateAccountInput{
-		UserID: userID, Name: "Ví có giao dịch", Type: "cash", Currency: "VND",
+		UserID: userID, Name: "Ví có giao dịch", Type: "cash",
 	})
 	if err != nil {
 		t.Fatalf("Create lỗi: %v", err)
@@ -262,7 +252,7 @@ func TestAccountDelete_KhongConGiaoDichThiXoaDuoc(t *testing.T) {
 	userID := uuid.New()
 
 	account, err := svc.Create(ctx, CreateAccountInput{
-		UserID: userID, Name: "Ví trống", Type: "cash", Currency: "VND",
+		UserID: userID, Name: "Ví trống", Type: "cash",
 	})
 	if err != nil {
 		t.Fatalf("Create lỗi: %v", err)
@@ -283,7 +273,7 @@ func TestAccountDelete_XoaRoiDatLaiTenDuoc(t *testing.T) {
 	ctx := context.Background()
 	userID := uuid.New()
 
-	in := CreateAccountInput{UserID: userID, Name: "Tiền mặt", Type: "cash", Currency: "VND"}
+	in := CreateAccountInput{UserID: userID, Name: "Tiền mặt", Type: "cash"}
 	account, err := svc.Create(ctx, in)
 	if err != nil {
 		t.Fatalf("Create lỗi: %v", err)
@@ -303,7 +293,7 @@ func TestAccountUpdate_ThanhCong(t *testing.T) {
 	userID := uuid.New()
 
 	account, err := svc.Create(ctx, CreateAccountInput{
-		UserID: userID, Name: "Ví cũ", Type: "cash", Currency: "VND",
+		UserID: userID, Name: "Ví cũ", Type: "cash",
 	})
 	if err != nil {
 		t.Fatalf("Create lỗi: %v", err)
@@ -318,10 +308,6 @@ func TestAccountUpdate_ThanhCong(t *testing.T) {
 
 	if updated.Name != "Ví mới" || updated.Type != "bank" {
 		t.Errorf("cập nhật sai: %+v", updated)
-	}
-	// Loại tiền và số dư không được đổi qua Update.
-	if updated.Currency != "VND" {
-		t.Errorf("Update không được đổi loại tiền, đang là %s", updated.Currency)
 	}
 }
 

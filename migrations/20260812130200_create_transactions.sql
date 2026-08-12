@@ -2,84 +2,68 @@
 -- +goose StatementBegin
 
 CREATE TABLE transactions (
-    id                 UUID          PRIMARY KEY,
-    user_id            UUID          NOT NULL REFERENCES users (id)      ON DELETE RESTRICT,
+    id          UUID          PRIMARY KEY,
+    user_id     UUID          NOT NULL REFERENCES users (id) ON DELETE RESTRICT,
 
-    -- Ví bị trừ tiền (chi, chuyển đi) hoặc được cộng tiền (thu).
-    account_id         UUID          NOT NULL REFERENCES accounts (id)   ON DELETE RESTRICT,
+    -- Nguồn tiền. Cho phép NULL vì người dùng có thể chỉ muốn ghi nhanh
+    -- "hôm nay ăn trưa 50k" mà không quan tâm trả bằng gì. Bắt buộc chọn
+    -- nguồn sẽ làm việc nhập liệu hằng ngày trở nên phiền.
+    account_id  UUID          REFERENCES accounts (id)   ON DELETE RESTRICT,
 
-    -- Ví nhận tiền. Chỉ dùng khi type = 'transfer'.
-    counter_account_id UUID          REFERENCES accounts (id)            ON DELETE RESTRICT,
+    -- Danh mục. Cũng cho phép NULL để ghi nhanh; báo cáo gom các khoản
+    -- này vào nhóm "Chưa phân loại".
+    category_id UUID          REFERENCES categories (id) ON DELETE RESTRICT,
 
-    -- Chuyển khoản giữa hai ví của chính mình không phải là thu hay chi,
-    -- nên không gắn danh mục.
-    category_id        UUID          REFERENCES categories (id)          ON DELETE RESTRICT,
-
-    type               TEXT          NOT NULL,
+    -- income: khoản thu, expense: khoản chi. Không có loại nào khác —
+    -- ứng dụng không hỗ trợ chuyển tiền giữa các nguồn.
+    type        TEXT          NOT NULL,
 
     -- Luôn là số dương. Tiền vào hay ra được suy ra từ cột type, không
     -- dùng dấu âm — nếu dùng dấu, mọi câu tổng hợp đều phải nhớ xử lý
     -- dấu và rất dễ sai.
-    amount             NUMERIC(19,4) NOT NULL,
+    amount      NUMERIC(19,4) NOT NULL,
 
-    -- Lưu lại loại tiền tại thời điểm giao dịch. Không đọc từ bảng
-    -- accounts vì ví có thể đổi loại tiền về sau, khi đó lịch sử cũ vẫn
-    -- phải giữ đúng loại tiền lúc phát sinh.
-    currency           CHAR(3)       NOT NULL,
+    currency    CHAR(3)       NOT NULL DEFAULT 'VND',
 
-    note               TEXT          NOT NULL DEFAULT '',
+    note        TEXT          NOT NULL DEFAULT '',
 
-    -- Thời điểm tiền thực sự chuyển, do người dùng nhập.
+    -- Thời điểm tiền thực sự chi ra hoặc thu vào, do người dùng nhập.
     -- Khác created_at là thời điểm bản ghi được tạo trong hệ thống: hôm
     -- nay nhập bữa ăn của hôm qua thì báo cáo phải tính vào hôm qua.
-    occurred_at        TIMESTAMPTZ   NOT NULL,
+    -- Toàn bộ báo cáo tổng hợp theo cột này.
+    occurred_at TIMESTAMPTZ   NOT NULL,
 
-    deleted_at         TIMESTAMPTZ,
+    deleted_at  TIMESTAMPTZ,
 
-    created_at         TIMESTAMPTZ   NOT NULL DEFAULT now(),
-    updated_at         TIMESTAMPTZ   NOT NULL DEFAULT now(),
+    created_at  TIMESTAMPTZ   NOT NULL DEFAULT now(),
+    updated_at  TIMESTAMPTZ   NOT NULL DEFAULT now(),
 
-    CONSTRAINT transactions_type_valid     CHECK (type IN ('income', 'expense', 'transfer')),
+    CONSTRAINT transactions_type_valid      CHECK (type IN ('income', 'expense')),
     CONSTRAINT transactions_amount_positive CHECK (amount > 0),
-    CONSTRAINT transactions_currency_format CHECK (currency ~ '^[A-Z]{3}$'),
-
-    -- Ràng buộc quan trọng nhất của bảng này: mỗi loại giao dịch phải có
-    -- đúng bộ cột của nó. Đặt ở database để dù có đường ghi dữ liệu nào
-    -- bỏ qua tầng ứng dụng thì cũng không tạo ra được bản ghi vô nghĩa
-    -- kiểu "chuyển khoản mà không có ví đích".
-    CONSTRAINT transactions_shape_valid CHECK (
-        (type = 'transfer'
-            AND counter_account_id IS NOT NULL
-            AND category_id IS NULL)
-        OR
-        (type IN ('income', 'expense')
-            AND counter_account_id IS NULL)
-    ),
-
-    -- Không thể chuyển tiền từ một ví sang chính nó.
-    CONSTRAINT transactions_accounts_differ CHECK (
-        counter_account_id IS NULL OR counter_account_id <> account_id
-    )
+    CONSTRAINT transactions_currency_format CHECK (currency ~ '^[A-Z]{3}$')
 );
 
--- Index chính phục vụ màn hình danh sách giao dịch: lọc theo người dùng,
--- sắp xếp mới nhất trước. Thêm cột id để phân trang bằng con trỏ có thứ
--- tự ổn định khi nhiều giao dịch trùng occurred_at.
+-- Index chính phục vụ cả màn hình danh sách lẫn mọi báo cáo theo kỳ:
+-- lọc theo người dùng rồi lấy khoảng thời gian, mới nhất trước.
+-- Thêm cột id để phân trang bằng con trỏ có thứ tự ổn định khi nhiều
+-- giao dịch trùng occurred_at.
 CREATE INDEX transactions_user_occurred_idx
     ON transactions (user_id, occurred_at DESC, id DESC)
     WHERE deleted_at IS NULL;
 
-CREATE INDEX transactions_account_idx
-    ON transactions (account_id)
+-- Báo cáo "chi tiêu theo danh mục" lọc theo người dùng, loại và khoảng
+-- thời gian rồi gom nhóm theo danh mục.
+CREATE INDEX transactions_user_type_occurred_idx
+    ON transactions (user_id, type, occurred_at)
     WHERE deleted_at IS NULL;
-
-CREATE INDEX transactions_counter_account_idx
-    ON transactions (counter_account_id)
-    WHERE deleted_at IS NULL AND counter_account_id IS NOT NULL;
 
 CREATE INDEX transactions_category_idx
     ON transactions (category_id)
     WHERE deleted_at IS NULL AND category_id IS NOT NULL;
+
+CREATE INDEX transactions_account_idx
+    ON transactions (account_id)
+    WHERE deleted_at IS NULL AND account_id IS NOT NULL;
 
 CREATE TRIGGER transactions_set_updated_at
     BEFORE UPDATE ON transactions

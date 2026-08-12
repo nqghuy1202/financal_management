@@ -21,10 +21,13 @@ const DefaultCurrency = "VND"
 
 // Loại giao dịch. Giá trị phải khớp với CHECK constraint của bảng
 // transactions.
+//
+// Không có loại "chuyển khoản": ứng dụng chỉ ghi nhận tiền vào và tiền
+// ra để tổng hợp bức tranh tài chính, không quản lý việc dịch chuyển
+// tiền giữa các nguồn.
 const (
-	TransactionTypeIncome   = "income"   // khoản thu
-	TransactionTypeExpense  = "expense"  // khoản chi
-	TransactionTypeTransfer = "transfer" // chuyển giữa hai ví của chính mình
+	TransactionTypeIncome  = "income"  // khoản thu
+	TransactionTypeExpense = "expense" // khoản chi
 )
 
 // Loại danh mục.

@@ -98,7 +98,8 @@ func (r *accountRepo) SoftDelete(ctx context.Context, id, userID uuid.UUID) (sql
 }
 
 func (r *accountRepo) CountTransactions(ctx context.Context, accountID uuid.UUID) (int64, error) {
-	count, err := r.q.CountTransactionsByAccount(ctx, accountID)
+	// Cột account_id cho phép NULL nên sqlc sinh tham số kiểu con trỏ.
+	count, err := r.q.CountTransactionsByAccount(ctx, &accountID)
 	if err != nil {
 		return 0, fmt.Errorf("đếm giao dịch của ví thất bại: %w", err)
 	}

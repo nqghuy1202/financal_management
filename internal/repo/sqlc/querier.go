@@ -11,8 +11,8 @@ import (
 )
 
 type Querier interface {
-	// Dùng trước khi xoá ví: ví còn giao dịch thì cảnh báo người dùng.
-	CountTransactionsByAccount(ctx context.Context, accountID uuid.UUID) (int64, error)
+	// Dùng trước khi xoá: nguồn tiền còn giao dịch thì không cho xoá.
+	CountTransactionsByAccount(ctx context.Context, accountID *uuid.UUID) (int64, error)
 	// Mọi truy vấn ở đây đều có điều kiện user_id.
 	//
 	// Đây là điểm bảo mật quan trọng nhất của tầng dữ liệu: nếu chỉ lọc theo
@@ -23,12 +23,6 @@ type Querier interface {
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
 	EmailExists(ctx context.Context, email string) (bool, error)
 	GetAccount(ctx context.Context, arg GetAccountParams) (Account, error)
-	// Khoá dòng ví lại trước khi đổi số dư.
-	//
-	// FOR UPDATE khiến transaction khác muốn khoá cùng dòng phải xếp hàng
-	// chờ. Nếu không có nó, hai giao dịch đồng thời trên cùng một ví có thể
-	// cùng đọc số dư cũ rồi cùng ghi đè, làm mất một trong hai khoản tiền.
-	GetAccountForUpdate(ctx context.Context, arg GetAccountForUpdateParams) (Account, error)
 	// Cột email là citext nên so sánh ở đây tự động không phân biệt hoa
 	// thường, không cần lower() ở hai vế.
 	GetUserByEmail(ctx context.Context, email string) (User, error)
@@ -38,7 +32,6 @@ type Querier interface {
 	// Xoá mềm để các giao dịch cũ vẫn tham chiếu được tới ví này.
 	SoftDeleteAccount(ctx context.Context, arg SoftDeleteAccountParams) (Account, error)
 	UpdateAccount(ctx context.Context, arg UpdateAccountParams) (Account, error)
-	UpdateAccountBalance(ctx context.Context, arg UpdateAccountBalanceParams) error
 	UpdateUserPassword(ctx context.Context, arg UpdateUserPasswordParams) error
 	UpdateUserProfile(ctx context.Context, arg UpdateUserProfileParams) (User, error)
 }

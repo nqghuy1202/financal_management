@@ -21,20 +21,40 @@
 
 **Tên đề xuất: FinTrack** — ứng dụng quản lý tài chính cá nhân.
 
+### Trọng tâm sản phẩm
+
+Người dùng nhập các khoản **thu và chi** hằng ngày. Hệ thống tổng hợp và
+trả lại **bức tranh tài chính** theo tháng hoặc năm.
+
+Phần báo cáo mới là giá trị cốt lõi; nhập liệu chỉ là đầu vào. Mọi quyết
+định thiết kế đều phục vụ điều đó.
+
+**Không có chức năng chuyển khoản.** Chuyển tiền giữa hai nguồn của chính
+mình không làm đổi tổng thu hay tổng chi, nên không đổi bức tranh tài
+chính — thêm vào chỉ khiến mọi truy vấn báo cáo phải nhớ loại trừ nó.
+
 ### Tính năng nghiệp vụ
-1. **Auth** — đăng ký, đăng nhập, JWT access (15m) + refresh (7d) có rotation, logout/revoke
-2. **Accounts (Ví)** — tiền mặt, ngân hàng, ví điện tử, thẻ tín dụng; mỗi ví có số dư + đơn vị tiền tệ
-3. **Categories** — danh mục thu/chi phân cấp, có icon + màu, seed sẵn bộ mặc định
-4. **Transactions** — thu / chi / chuyển khoản giữa 2 ví, kèm ghi chú, tag, ngày
-5. **Recurring transactions** — giao dịch định kỳ (tiền nhà hàng tháng…) do scheduler sinh ra
-6. **Budgets** — hạn mức theo danh mục theo tháng, cảnh báo ở mốc 80% và 100%
-7. **Savings goals** — mục tiêu tiết kiệm, theo dõi tiến độ
-8. **Reports & Dashboard** — chi tiêu theo danh mục, dòng tiền theo thời gian, so sánh tháng
-9. **Notifications** — in-app realtime (SSE) + email
+1. **Auth** — đăng ký, đăng nhập, JWT access (15m) + refresh (7d), logout
+2. **Nguồn tiền** — tiền mặt, ngân hàng, ví điện tử, thẻ tín dụng. Chỉ là
+   nhãn để biết tiền đi qua đâu, **không theo dõi số dư**
+3. **Danh mục** — thu/chi, phẳng, có icon và màu, seed sẵn 16 danh mục
+4. **Giao dịch** — chỉ thu và chi, kèm số tiền, danh mục, ngày, ghi chú
+5. **Báo cáo** — bốn góc nhìn, xem mục bên dưới
+6. **Ngân sách** — hạn mức theo danh mục theo tháng, cảnh báo khi vượt
+7. **Thông báo** — in-app realtime (SSE) + email
+
+### Bốn báo cáo bắt buộc có
+| Báo cáo | Trả lời câu hỏi |
+|---|---|
+| Chi tiêu theo danh mục | Tháng này tiền đi đâu? Danh mục nào chiếm nhiều nhất? |
+| Dòng tiền theo thời gian | Thu và chi từng tháng trong năm biến động thế nào? |
+| So sánh kỳ này với kỳ trước | Tháng này chi nhiều hơn tháng trước bao nhiêu? Do danh mục nào? |
+| Tỷ lệ tiết kiệm và số dư ròng | Tháng này dư hay âm? Để dành được bao nhiêu phần trăm thu nhập? |
 
 ### Quyết định thiết kế quan trọng
-- **Tiền lưu bằng `int64` đơn vị nhỏ nhất** (VND: đồng, USD: cent) + mã tiền tệ. **Tuyệt đối không dùng `float`.** Đây là câu hỏi phỏng vấn kinh điển cho hệ thống tài chính.
-- **Số dư ví là derived + snapshot**: có cột `balance` được cập nhật trong cùng DB transaction với giao dịch (dùng `SELECT ... FOR UPDATE`), đồng thời có job đối soát lại từ bảng transactions.
+- **Tiền lưu bằng `NUMERIC(19,4)`**, phía Go dùng `shopspring/decimal` bọc trong kiểu `model.Money` gắn liền số tiền với loại tiền tệ. **Tuyệt đối không dùng `float`.**
+- **Không lưu số dư ở đâu cả.** Số dư ròng luôn được tính từ giao dịch, nên không bao giờ lệch với thực tế.
+- **Mọi báo cáo tổng hợp theo `occurred_at`** (ngày tiền thực sự thu/chi), không theo `created_at`.
 - **Mọi event ra Kafka đều đi qua Outbox**, không bao giờ publish trực tiếp trong handler.
 
 ---
@@ -78,8 +98,8 @@
                      │
         ┌────────────▼─────────┐      ┌──────────────────┐
         │ read-model tables    │      │ cmd/scheduler    │
-        │ rm_monthly_summary   │      │ recurring txn,   │
-        │ rm_category_spending │      │ weekly summary   │
+        │ rm_monthly_summary   │      │ tong ket tuan,   │
+        │ rm_category_spending │      │ tong ket thang   │
         └──────────────────────┘      └──────────────────┘
 ```
 
@@ -90,7 +110,7 @@
 | `cmd/outbox-relay` | Đọc `outbox_events` → publish Kafka → đánh dấu đã gửi |
 | `cmd/analytics-worker` | Consume transaction event → dựng read-model (CQRS) |
 | `cmd/notification-worker` | Consume budget/notification event → email + push SSE |
-| `cmd/scheduler` | Cron: sinh giao dịch định kỳ, gửi tổng kết tuần |
+| `cmd/scheduler` | Cron: gửi tổng kết tuần/tháng |
 
 ### Kafka topics
 | Topic | Key | Events |
@@ -114,7 +134,7 @@ Consumer groups: `analytics-cg`, `notification-cg` — mỗi group đọc độc
 2. **Idempotent consumer** — bảng `processed_events` + upsert, xử lý at-least-once delivery của Kafka
 3. **Retry + Dead Letter Queue** — exponential backoff, kèm CLI replay lại message từ DLQ
 4. **CQRS read-model + event replay** — có lệnh dựng lại toàn bộ bảng thống kê bằng cách đọc lại Kafka từ offset 0
-5. **Money as integer minor units** — không bao giờ dùng float cho tiền
+5. **Kiểu Money riêng** — số tiền luôn đi kèm loại tiền tệ, cộng hai loại tiền khác nhau là lỗi biên dịch được chặn, không bao giờ dùng float
 6. **sqlc** — SQL thuần được sinh ra code Go type-safe, không ORM che giấu query
 7. **Testcontainers** — integration test chạy Postgres + Kafka thật trong Docker (thư viện này đã có sẵn trong `go.mod` của bạn)
 8. **Distributed tracing xuyên Kafka** — nhét trace context vào Kafka header, xem được một request đi từ HTTP → DB → Kafka → worker trên Jaeger

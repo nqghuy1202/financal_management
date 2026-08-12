@@ -12,8 +12,8 @@ Migration thật nằm trong `migrations/`, được quản lý bằng goose.
 | Thời gian | `timestamptz` | Luôn lưu UTC. Không bao giờ dùng `timestamp` (không có múi giờ) vì nó sẽ sai khi server và người dùng khác múi giờ. |
 | Enum | `text` + `CHECK` | Kiểu `ENUM` của Postgres không xoá được giá trị đã thêm; mỗi lần đổi là một migration phiền phức. |
 | Xoá dữ liệu tài chính | Soft delete (`deleted_at`) | Lịch sử giao dịch là dữ liệu không tái tạo được. Cũng cần cho việc replay event ở Phase 4. |
-| Khoá ngoại | `ON DELETE RESTRICT` | Không bao giờ `CASCADE` trên dữ liệu tài chính — xoá một ví mà cuốn theo toàn bộ giao dịch là mất dữ liệu vĩnh viễn. |
-| Đa tiền tệ | Mỗi ví một loại tiền, báo cáo không quy đổi | Có sẵn cột `currency` để mở rộng sau, nhưng chưa cần bảng tỷ giá. |
+| Khoá ngoại | `ON DELETE RESTRICT` | Không bao giờ `CASCADE` trên dữ liệu tài chính — xoá một nguồn tiền mà cuốn theo toàn bộ giao dịch là mất dữ liệu vĩnh viễn. |
+| Đa tiền tệ | Mỗi giao dịch mang loại tiền riêng, báo cáo không quy đổi | Có sẵn cột `currency` để mở rộng sau, nhưng chưa cần bảng tỷ giá. |
 
 ### Vì sao `NUMERIC` chứ không phải `BIGINT` đơn vị nhỏ nhất
 
@@ -27,17 +27,19 @@ bao giờ để lộ `decimal.Decimal` trần** ra ngoài — mọi số tiền 
 `model.Money` gắn liền `amount + currency`, và kiểu đó không có phương
 thức nào nhận `float64`.
 
-### Vì sao transfer là một dòng, không phải double-entry
+### Vì sao không có chức năng chuyển khoản
 
-Đây là ứng dụng quản lý chi tiêu cá nhân, không phải hệ thống kế toán.
-Người dùng nghĩ "tôi chuyển 2 triệu từ ví tiền mặt sang tài khoản ngân
-hàng" là **một** việc, nên danh sách giao dịch cũng nên hiện một dòng.
-Double-entry đúng chuẩn kế toán hơn nhưng khiến mọi truy vấn danh sách và
-báo cáo phải gộp lại theo cặp.
+Trọng tâm của ứng dụng là **tổng hợp bức tranh tài chính**: người dùng
+nhập các khoản thu và chi, hệ thống tính toán và trả lại cái nhìn tổng
+quan theo tháng hoặc năm.
 
-**Hệ quả phải nhớ:** mọi truy vấn báo cáo chi tiêu **bắt buộc** lọc
-`type <> 'transfer'`. Nếu quên, chuyển tiền giữa hai ví của chính mình sẽ
-bị đếm thành khoản chi. Đây là lỗi kinh điển của mô hình một dòng.
+Chuyển tiền giữa hai nguồn của chính mình không làm thay đổi bức tranh đó
+— tổng thu không đổi, tổng chi không đổi. Thêm chức năng này chỉ làm mọi
+truy vấn báo cáo phải nhớ loại trừ nó, và quên một chỗ là số liệu sai.
+
+Hệ quả: bảng `accounts` chỉ còn là **nhãn nguồn tiền** (tiền mặt, thẻ,
+ví điện tử), không có cột số dư. Số dư ròng được tính từ toàn bộ giao
+dịch khi làm báo cáo, nên không bao giờ lệch.
 
 ## 2. Lược đồ
 
@@ -50,12 +52,13 @@ bị đếm thành khoản chi. Đây là lỗi kinh điển của mô hình m�
                                        │ 1
          ┌──────────────┬──────────────┼──────────────┬──────────────┐
          │ N            │ N            │ N            │ N            │ N
-   ┌─────▼──────┐ ┌─────▼──────┐ ┌─────▼──────┐ ┌─────▼─────┐ ┌──────▼────┐
-   │  accounts  │ │ categories │ │transactions│ │  budgets  │ │   goals   │
-   └─────▲──────┘ └─────▲──────┘ └─────┬──────┘ └───────────┘ └───────────┘
+   ┌─────▼──────┐ ┌─────▼──────┐ ┌─────▼──────┐ ┌─────▼─────┐
+   │  accounts  │ │ categories │ │transactions│ │  budgets  │
+   │ (nguồn tiền)│ │            │ │            │ │ (Phase 5) │
+   └─────▲──────┘ └─────▲──────┘ └─────┬──────┘ └───────────┘
          │              │              │
          └──────────────┴──────────────┘
-           account_id, counter_account_id, category_id
+            account_id, category_id (đều cho phép NULL)
 ```
 
 ## 3. Bảng theo phase
@@ -69,7 +72,7 @@ trống — đến lúc dùng gần như chắc chắn phải sửa lại thiế
 | 2 | `accounts`, `categories`, `transactions` |
 | 3 | `outbox_events`, `processed_events` |
 | 4 | `rm_monthly_summary`, `rm_category_spending` |
-| 5 | `budgets`, `goals`, `recurring_transactions`, `notifications` |
+| 5 | `budgets`, `notifications` |
 
 ## 4. Chi tiết các bảng
 
@@ -79,7 +82,7 @@ trống — đến lúc dùng gần như chắc chắn phải sửa lại thiế
 |---|---|---|
 | `id` | `uuid` PK | UUIDv7 |
 | `email` | `citext` UNIQUE | Không phân biệt hoa thường |
-| `password_hash` | `text` | Argon2id, đã gồm salt và tham số |
+| `password_hash` | `text` | bcrypt cost 12, chuỗi đã gồm sẵn salt |
 | `full_name` | `text` | |
 | `base_currency` | `char(3)` | ISO 4217, mặc định `VND` |
 | `email_verified_at` | `timestamptz` NULL | |
@@ -89,18 +92,24 @@ Dùng `citext` thay vì `text` cho email: người dùng gõ `Huy@Gmail.com` hay
 `huy@gmail.com` phải là cùng một tài khoản. Nếu dùng `text`, ràng buộc
 UNIQUE sẽ cho phép đăng ký trùng chỉ khác hoa thường.
 
-### `transactions` (Phase 2) — thiết kế trước để tham chiếu
+### `transactions` (Phase 2)
 
 | Cột | Ghi chú |
 |---|---|
-| `type` | `income` / `expense` / `transfer` |
+| `type` | Chỉ `income` hoặc `expense` |
 | `amount` | `NUMERIC(19,4)`, **luôn dương**; dấu suy ra từ `type` |
-| `occurred_at` | Ngày tiền thực sự chuyển, do người dùng nhập |
+| `occurred_at` | Ngày tiền thực sự thu/chi, do người dùng nhập |
 | `created_at` | Ngày ghi nhận vào hệ thống |
-| `counter_account_id` | Chỉ có giá trị khi `type = 'transfer'` |
+| `account_id` | Nguồn tiền, cho phép NULL |
+| `category_id` | Danh mục, cho phép NULL |
 
 Tách `occurred_at` khỏi `created_at` là bắt buộc: hôm nay nhập bữa ăn của
-hôm qua thì báo cáo tháng phải tính vào hôm qua.
+hôm qua thì báo cáo tháng phải tính vào hôm qua. **Mọi báo cáo tổng hợp
+theo `occurred_at`**, không bao giờ theo `created_at`.
+
+`account_id` và `category_id` đều cho phép NULL để người dùng ghi nhanh
+"hôm nay ăn trưa 50k" mà không phải chọn thêm gì. Báo cáo gom các khoản
+không có danh mục vào nhóm "Chưa phân loại".
 
 ### `categories` (Phase 2)
 
@@ -130,20 +139,26 @@ CREATE INDEX ON outbox_events (created_at) WHERE published_at IS NULL;
 
 ## 5. Refresh token không nằm trong PostgreSQL
 
-Refresh token lưu trong Redis với TTL bằng đúng thời hạn của token, nên
-token hết hạn tự biến mất mà không cần job dọn dẹp.
+Refresh token là một chuỗi ngẫu nhiên 32 byte, lưu trong Redis với TTL
+bằng đúng thời hạn của token, nên token hết hạn tự biến mất mà không cần
+job dọn dẹp.
 
-Kèm phát hiện tái sử dụng: mỗi refresh token mang một `jti`, dùng xong là
-xoá ngay. Nếu ai đó trình lại một `jti` đã bị xoá, nghĩa là token đã bị
-đánh cắp và dùng lại — khi đó revoke toàn bộ phiên đăng nhập của người
-dùng đó.
+Mỗi token chỉ dùng được một lần: `ConsumeRefresh` gọi `GETDEL` của Redis,
+đọc và xoá trong cùng một lệnh. Nhờ vậy hai request đồng thời không thể
+cùng đổi một token, và token đã dùng thì không dùng lại được.
 
-## 6. Số dư ví
+Bản thiết kế đầu có thêm cơ chế phát hiện tái sử dụng (trình lại token đã
+xoá thì thu hồi toàn bộ phiên của người dùng đó), nhưng đã bỏ cho đơn
+giản. Có thể thêm sau mà không phải đổi cấu trúc dữ liệu.
 
-`accounts.balance` được lưu sẵn và cập nhật trong **cùng transaction** với
-việc ghi giao dịch, dùng `SELECT ... FOR UPDATE` để tránh cập nhật chồng
-chéo khi có hai request đồng thời.
+## 6. Danh mục hệ thống được seed bằng migration
 
-Số dư lưu sẵn có thể lệch nếu code sai, nên kèm một truy vấn đối soát tính
-lại số dư từ bảng `transactions` để so sánh. Đọc nhanh mà vẫn kiểm chứng
-được tính đúng đắn.
+16 danh mục mặc định (Ăn uống, Đi lại, Lương...) có `user_id = NULL` và
+được chèn một lần bằng migration, không sinh lại cho từng người dùng khi
+đăng ký.
+
+Lý do: không nhân bản hàng chục dòng giống nhau cho mỗi tài khoản mới,
+đăng ký chỉ còn một thao tác ghi nên không cần transaction nhiều bảng, và
+sửa tên hay biểu tượng của một danh mục chỉ là sửa một dòng.
+
+Người dùng vẫn tạo được danh mục riêng; khi đó `user_id` có giá trị.

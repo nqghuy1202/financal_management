@@ -16,8 +16,6 @@ type Account struct {
 	UserID    uuid.UUID
 	Name      string
 	Type      string
-	Currency  string
-	Balance   decimal.Decimal
 	Icon      string
 	DeletedAt *time.Time
 	CreatedAt time.Time
@@ -37,19 +35,18 @@ type Category struct {
 }
 
 type Transaction struct {
-	ID               uuid.UUID
-	UserID           uuid.UUID
-	AccountID        uuid.UUID
-	CounterAccountID *uuid.UUID
-	CategoryID       *uuid.UUID
-	Type             string
-	Amount           decimal.Decimal
-	Currency         string
-	Note             string
-	OccurredAt       time.Time
-	DeletedAt        *time.Time
-	CreatedAt        time.Time
-	UpdatedAt        time.Time
+	ID         uuid.UUID
+	UserID     uuid.UUID
+	AccountID  *uuid.UUID
+	CategoryID *uuid.UUID
+	Type       string
+	Amount     decimal.Decimal
+	Currency   string
+	Note       string
+	OccurredAt time.Time
+	DeletedAt  *time.Time
+	CreatedAt  time.Time
+	UpdatedAt  time.Time
 }
 
 type User struct {
