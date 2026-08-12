@@ -1,34 +1,44 @@
-# Binaries for programs and plugins
+# Binaries
 *.exe
 *.exe~
 *.dll
 *.so
 *.dylib
-
-# Test binary, built with "go test -c"
-*.test
-
-# Output of the go coverage tool, specifically when used with LiteIDE
-*.out
-
-# Dependency directories (remove the comment below to include it)
-# vendor/
-
-# Go workspace file
-go.work
-tmp/
-
-# IDE specific files
-.vscode
-.idea
-
-# .env file
-.env
-
-# Project build
+bin/
 main
-*templ.go
 
-# OS X generated file
+# Test & coverage
+*.test
+*.out
+coverage.html
+coverage
+
+# Go
+go.work
+go.work.sum
+vendor/
+
+# Thư mục tạm (air build, log lúc dev)
+tmp/
+log/
+
+# Secrets & config cục bộ
+.env
+.env.*
+!.env.example
+config/local.override.yaml
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
 .DS_Store
+Thumbs.db
 
+# Frontend (Phase 6)
+web/node_modules/
+web/.next/
+web/out/
+web/.env*.local

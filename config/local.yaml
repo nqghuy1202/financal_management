@@ -1,14 +1,55 @@
 server:
+  mode: debug
   port: 8080
-databases:
-  - user: admin
-    password: admin
-    host: localhost
-    dbName: financalManagement
-  - user: management
-    password: management
-    host: localhost
-    dbName: financal
-security:
-  jwt: 
-    key: abc123
+  allowOrigins:
+    - http://localhost:3000
+  shutdownTimeout: 10s
+  readTimeout: 10s
+  writeTimeout: 30s
+  idleTimeout: 60s
+
+logger:
+  level: debug
+  fileName: ./tmp/log/app.log
+  maxSize: 100
+  maxBackups: 5
+  maxAge: 30
+  compress: false
+
+postgres:
+  host: localhost
+  port: 5432
+  user: fintrack
+  password: fintrack
+  dbName: fintrack
+  sslMode: disable
+  maxConns: 20
+  minConns: 2
+  maxConnLifetime: 1h
+  maxConnIdleTime: 30m
+  connectTimeout: 5s
+
+redis:
+  host: localhost
+  port: 6379
+  password: ""
+  db: 0
+  poolSize: 10
+
+kafka:
+  brokers:
+    - localhost:9092
+  topicPrefix: fin
+
+jwt:
+  # Chỉ dùng cho môi trường local. Production bắt buộc override bằng
+  # biến môi trường FM_JWT_SECRET.
+  secret: local-dev-secret-please-change-me-32chars
+  issuer: financal_management
+  accessTokenTTL: 15m
+  refreshTokenTTL: 168h # 7 ngày
+
+rateLimit:
+  enabled: true
+  capacity: 100 # cho phép dồn tối đa 100 request
+  refillPerSecond: 10 # duy trì 10 request/giây

@@ -1,49 +1,88 @@
-# Simple Makefile for a Go project
+.DEFAULT_GOAL := help
 
-# Build the application
-all: build test
+BINARY_DIR := bin
+API_BINARY := $(BINARY_DIR)/api.exe
 
-build:
-	@echo "Building..."
-	
-	
-	@go build -o main.exe cmd/api/main.go
+# ---------------------------------------------------------------------
+# Trợ giúp
+# ---------------------------------------------------------------------
+.PHONY: help
+help: ## Hiển thị danh sách lệnh
+	@powershell -NoProfile -Command "Select-String -Path Makefile -Pattern '^[a-zA-Z_-]+:.*?## .*$$' | ForEach-Object { $$p = $$_.Line -split ':.*?## '; '{0,-20} {1}' -f $$p[0], $$p[1] }"
 
-# Run the application
-run:
-	@go run cmd/api/main.go
-# Create DB container
-docker-run:
-	@docker compose up --build
+# ---------------------------------------------------------------------
+# Hạ tầng
+# ---------------------------------------------------------------------
+.PHONY: up
+up: ## Khởi động toàn bộ hạ tầng (postgres, redis, kafka, kafka-ui, mailhog)
+	docker compose up -d
 
-# Shutdown DB container
-docker-down:
-	@docker compose down
+.PHONY: down
+down: ## Dừng hạ tầng, giữ lại dữ liệu
+	docker compose down
 
-# Test the application
-test:
-	@echo "Testing..."
-	@go test ./... -v
-# Integrations Tests for the application
-itest:
-	@echo "Running integration tests..."
-	@go test ./internal/database -v
+.PHONY: clean-infra
+clean-infra: ## Dừng hạ tầng và XOÁ toàn bộ dữ liệu trong volume
+	docker compose down -v
 
-# Clean the binary
-clean:
-	@echo "Cleaning..."
-	@rm -f main
+.PHONY: logs
+logs: ## Xem log của hạ tầng
+	docker compose logs -f
 
-# Live Reload
-watch:
-	@powershell -ExecutionPolicy Bypass -Command "if (Get-Command air -ErrorAction SilentlyContinue) { \
-		air; \
-		Write-Output 'Watching...'; \
-	} else { \
-		Write-Output 'Installing air...'; \
-		go install github.com/air-verse/air@latest; \
-		air; \
-		Write-Output 'Watching...'; \
-	}"
+.PHONY: ps
+ps: ## Xem trạng thái các container
+	docker compose ps
 
-.PHONY: all build run test clean watch docker-run docker-down itest
+# ---------------------------------------------------------------------
+# Ứng dụng
+# ---------------------------------------------------------------------
+.PHONY: build
+build: ## Build API server
+	go build -o $(API_BINARY) ./cmd/api
+
+.PHONY: run
+run: ## Chạy API server
+	go run ./cmd/api
+
+.PHONY: watch
+watch: ## Chạy API server với live reload (air)
+	@powershell -NoProfile -ExecutionPolicy Bypass -Command "if (Get-Command air -ErrorAction SilentlyContinue) { air } else { Write-Output 'Chua cai air, dang cai...'; go install github.com/air-verse/air@latest; air }"
+
+# ---------------------------------------------------------------------
+# Chất lượng code
+# ---------------------------------------------------------------------
+.PHONY: fmt
+fmt: ## Format toàn bộ code
+	go fmt ./...
+
+.PHONY: vet
+vet: ## Chạy go vet
+	go vet ./...
+
+.PHONY: lint
+lint: ## Chạy golangci-lint
+	@powershell -NoProfile -ExecutionPolicy Bypass -Command "if (Get-Command golangci-lint -ErrorAction SilentlyContinue) { golangci-lint run ./... } else { Write-Output 'Chua cai golangci-lint. Cai bang: go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest'; exit 1 }"
+
+.PHONY: test
+test: ## Chạy unit test (nhanh, không cần docker)
+	go test -short -race -cover ./...
+
+.PHONY: itest
+itest: ## Chạy integration test (cần docker chạy sẵn)
+	go test -race -count=1 -tags=integration ./...
+
+.PHONY: cover
+cover: ## Chạy test và mở báo cáo coverage
+	go test -short -coverprofile=coverage.out ./...
+	go tool cover -html=coverage.out
+
+.PHONY: check
+check: fmt vet lint test ## Chạy toàn bộ kiểm tra trước khi commit
+
+.PHONY: tidy
+tidy: ## Dọn go.mod
+	go mod tidy
+
+.PHONY: clean
+clean: ## Xoá file build
+	@powershell -NoProfile -Command "if (Test-Path '$(BINARY_DIR)') { Remove-Item -Recurse -Force '$(BINARY_DIR)' }; if (Test-Path 'coverage.out') { Remove-Item -Force 'coverage.out' }"

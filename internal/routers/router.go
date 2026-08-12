@@ -1,43 +1,34 @@
+// Package routers khai báo các route của ứng dụng, nhóm theo module
+// nghiệp vụ.
+//
+// Phân chia trách nhiệm:
+//   - internal/initialize/router.go dựng gin.Engine và gắn middleware
+//     toàn cục.
+//   - package này chỉ khai báo đường dẫn và nối vào controller tương ứng.
+//
+// Nhờ tách như vậy, thêm một module mới chỉ cần thêm một file router
+// trong package này và một dòng gọi trong RegisterRoutes.
 package routers
 
 import (
-	"financal_management/internal/controller"
-	"financal_management/internal/middlewares"
-	"fmt"
-
 	"github.com/gin-gonic/gin"
 )
 
-func AA() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		fmt.Println("Before -> AA")
-		c.Next()
-		fmt.Println("Alter -> AA")
-	}
-}
+// RegisterRoutes gắn toàn bộ route của ứng dụng vào engine.
+func RegisterRoutes(r *gin.Engine) {
+	registerHealthRoutes(r)
 
-func BB() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		fmt.Println("Before -> BB")
-		c.Next()
-		fmt.Println("Alter -> BB")
-	}
-}
+	// API nghiệp vụ đều nằm dưới /api/v1 để về sau còn ra được v2 mà
+	// không phá vỡ client cũ.
+	v1 := r.Group("/api/v1")
 
-func CC(c *gin.Context) {
-	fmt.Println("Before -> CC")
-	c.Next()
-	fmt.Println("Alter -> CC")
-}
-
-func NewRouter() *gin.Engine {
-	r := gin.Default()
-	r.Use(middlewares.AuthenMiddleware(), BB(), CC)
-	v1 := r.Group("v1/2026")
-	{
-		v1.GET("/info", controller.NewUserController().GetResponseStatus)
-	}
-	// r.GET("/info", controller.NewUserController().GetResponseStatus)
-	// r.Run()
-	return r
+	// Các module sẽ được thêm ở các phase sau:
+	//   registerAuthRoutes(v1)          — Phase 1
+	//   registerAccountRoutes(v1)       — Phase 2
+	//   registerCategoryRoutes(v1)      — Phase 2
+	//   registerTransactionRoutes(v1)   — Phase 2
+	//   registerReportRoutes(v1)        — Phase 4
+	//   registerBudgetRoutes(v1)        — Phase 5
+	//   registerNotificationRoutes(v1)  — Phase 5
+	_ = v1
 }

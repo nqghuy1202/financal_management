@@ -1,0 +1,55 @@
+server:
+  mode: release
+  port: 8080
+  allowOrigins:
+    - https://fintrack.example.com
+  shutdownTimeout: 20s
+  readTimeout: 10s
+  writeTimeout: 30s
+  idleTimeout: 60s
+
+logger:
+  level: info
+  fileName: /var/log/fintrack/app.log
+  maxSize: 200
+  maxBackups: 10
+  maxAge: 30
+  compress: true
+
+# Mọi giá trị nhạy cảm bên dưới phải được override bằng biến môi trường
+# (xem README, tiền tố FM_). Không bao giờ commit secret thật vào file này.
+postgres:
+  host: postgres
+  port: 5432
+  user: fintrack
+  password: ""
+  dbName: fintrack
+  sslMode: require
+  maxConns: 50
+  minConns: 5
+  maxConnLifetime: 1h
+  maxConnIdleTime: 30m
+  connectTimeout: 5s
+
+redis:
+  host: redis
+  port: 6379
+  password: ""
+  db: 0
+  poolSize: 50
+
+kafka:
+  brokers:
+    - kafka:9092
+  topicPrefix: fin
+
+jwt:
+  secret: ""
+  issuer: financal_management
+  accessTokenTTL: 15m
+  refreshTokenTTL: 168h
+
+rateLimit:
+  enabled: true
+  capacity: 60
+  refillPerSecond: 5

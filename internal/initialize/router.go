@@ -1,43 +1,39 @@
 package initialize
 
 import (
-	"financal_management/internal/controller"
+	"financal_management/global"
 	"financal_management/internal/middlewares"
-	"fmt"
+	"financal_management/internal/routers"
 
 	"github.com/gin-gonic/gin"
 )
 
-func AA() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		fmt.Println("Before -> AA")
-		c.Next()
-		fmt.Println("Alter -> AA")
-	}
-}
-
-func BB() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		fmt.Println("Before -> BB")
-		c.Next()
-		fmt.Println("Alter -> BB")
-	}
-}
-
-func CC(c *gin.Context) {
-	fmt.Println("Before -> CC")
-	c.Next()
-	fmt.Println("Alter -> CC")
-}
-
+// InitRouter dựng gin.Engine, gắn middleware toàn cục rồi đăng ký route.
 func InitRouter() *gin.Engine {
-	r := gin.Default()
-	r.Use(middlewares.AuthenMiddleware(), BB(), CC)
-	v1 := r.Group("v1/2026")
-	{
-		v1.GET("/info", controller.NewUserController().GetResponseStatus)
-	}
-	// r.GET("/info", controller.NewUserController().GetResponseStatus)
-	// r.Run()
+	gin.SetMode(global.Config.Server.Mode)
+
+	// gin.New() thay vì gin.Default(): Default gắn sẵn Logger và Recovery
+	// mặc định của gin (ghi text ra stdout). Ở đây ta dùng bản riêng ghi
+	// JSON qua zap, nên phải tự lắp từ engine trắng.
+	r := gin.New()
+
+	// Thứ tự middleware rất quan trọng, request đi từ trên xuống:
+	//  1. RequestID  — sinh id trước, để mọi log phía sau đều có id
+	//  2. Logger     — bọc ngoài cùng phần đo thời gian, ghi log khi xong
+	//  3. Recovery   — bắt panic của các tầng bên trong
+	//  4. ErrorHandler — dựng response từ lỗi handler đẩy vào c.Error()
+	//  5. CORS       — trả preflight sớm
+	//  6. RateLimit  — chặn trước khi chạm vào handler nghiệp vụ
+	r.Use(
+		middlewares.RequestID(),
+		middlewares.Logger(),
+		middlewares.Recovery(),
+		middlewares.ErrorHandler(),
+		middlewares.CORS(),
+		middlewares.RateLimit(),
+	)
+
+	routers.RegisterRoutes(r)
+
 	return r
 }
