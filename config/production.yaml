@@ -50,6 +50,15 @@ jwt:
   refreshTokenTTL: 168h
 
 rateLimit:
-  enabled: true
-  capacity: 60
-  refillPerSecond: 5
+  ip:
+    enabled: true
+    capacity: 60
+    refillPerSecond: 5
+  user:
+    enabled: true
+    capacity: 200
+    refillPerSecond: 20
+  login:
+    enabled: true
+    capacity: 5
+    refillPerSecond: 0.05

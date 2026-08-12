@@ -6,10 +6,11 @@ import (
 	"financal_management/internal/routers"
 
 	"github.com/gin-gonic/gin"
+	"github.com/redis/go-redis/v9"
 )
 
 // InitRouter dựng gin.Engine, gắn middleware toàn cục rồi đăng ký route.
-func InitRouter() *gin.Engine {
+func InitRouter(rdb *redis.Client, deps routers.Deps) *gin.Engine {
 	gin.SetMode(global.Config.Server.Mode)
 
 	// gin.New() thay vì gin.Default(): Default gắn sẵn Logger và Recovery
@@ -24,16 +25,20 @@ func InitRouter() *gin.Engine {
 	//  4. ErrorHandler — dựng response từ lỗi handler đẩy vào c.Error()
 	//  5. CORS       — trả preflight sớm
 	//  6. RateLimit  — chặn trước khi chạm vào handler nghiệp vụ
+	//
+	// Hạn mức toàn cục khoá theo IP vì ở tầng này chưa biết người dùng là
+	// ai. Hạn mức theo user được gắn riêng cho từng nhóm route đã xác
+	// thực, bên trong package routers.
 	r.Use(
 		middlewares.RequestID(),
 		middlewares.Logger(),
 		middlewares.Recovery(),
 		middlewares.ErrorHandler(),
 		middlewares.CORS(),
-		middlewares.RateLimit(),
+		middlewares.RateLimit(rdb, "ip", global.Config.RateLimit.IP, middlewares.KeyByIP),
 	)
 
-	routers.RegisterRoutes(r)
+	routers.RegisterRoutes(r, deps)
 
 	return r
 }

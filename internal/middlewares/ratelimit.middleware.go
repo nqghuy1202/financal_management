@@ -8,6 +8,7 @@ import (
 
 	"financal_management/global"
 	"financal_management/internal/pkg/response"
+	"financal_management/internal/pkg/setting"
 
 	"github.com/gin-gonic/gin"
 	"github.com/redis/go-redis/v9"
@@ -56,34 +57,60 @@ redis.call('PEXPIRE', key, math.ceil(capacity / refill * 1000) + 1000)
 return {allowed, math.floor(tokens)}
 `)
 
-// RateLimit giới hạn số request theo từng client.
-//
-// Khoá được tính theo user id nếu request đã xác thực, ngược lại theo IP.
-// Nhờ vậy nhiều người dùng sau cùng một NAT không bị tính chung hạn mức.
-func RateLimit() gin.HandlerFunc {
-	cfg := global.Config.RateLimit
+// KeyFunc trích ra định danh dùng làm khoá hạn mức cho một request.
+type KeyFunc func(c *gin.Context) string
 
-	if !cfg.Enabled {
+// KeyByIP khoá theo địa chỉ IP của client. Dùng cho request chưa xác thực.
+//
+// Không gắn tiền tố "ip:" vì scope truyền cho RateLimit đã nằm trong khoá
+// Redis rồi; thêm nữa chỉ tạo ra khoá kiểu "ratelimit:ip:ip:...".
+func KeyByIP(c *gin.Context) string {
+	return c.ClientIP()
+}
+
+// KeyByUser khoá theo người dùng đã đăng nhập.
+//
+// Chỉ dùng được cho route nằm SAU middleware xác thực. Nếu đặt trước, giá
+// trị user id chưa tồn tại và mọi request sẽ rơi về khoá IP — biến hạn
+// mức theo user thành vô nghĩa. Rơi về IP ở đây là lưới an toàn, không
+// phải cách dùng dự kiến.
+//
+// Hai nhánh dùng tiền tố khác nhau để một user id không bao giờ đụng khoá
+// với một địa chỉ IP.
+func KeyByUser(c *gin.Context) string {
+	if userID := c.GetString(ContextUserIDKey); userID != "" {
+		return "u:" + userID
+	}
+	return "anon:" + c.ClientIP()
+}
+
+// RateLimit giới hạn số request theo một hạn mức và cách khoá cho trước.
+//
+// scope đi vào khoá Redis nên các hạn mức khác nhau đếm độc lập: một
+// người dùng bị chặn ở nhóm "login" vẫn còn nguyên hạn mức ở nhóm "user".
+func RateLimit(rdb *redis.Client, scope string, rule setting.RateLimitRule, key KeyFunc) gin.HandlerFunc {
+	if !rule.Enabled {
 		// Trả về middleware rỗng thay vì kiểm tra cờ ở mỗi request.
 		return func(c *gin.Context) { c.Next() }
 	}
 
-	capacity := strconv.Itoa(cfg.Capacity)
-	refill := strconv.FormatFloat(cfg.RefillPerSecond, 'f', -1, 64)
+	capacity := strconv.Itoa(rule.Capacity)
+	refill := strconv.FormatFloat(rule.RefillPerSecond, 'f', -1, 64)
 
 	return func(c *gin.Context) {
 		ctx, cancel := context.WithTimeout(c.Request.Context(), 200*time.Millisecond)
 		defer cancel()
 
-		key := fmt.Sprintf("ratelimit:%s", clientKey(c))
+		redisKey := fmt.Sprintf("ratelimit:%s:%s", scope, key(c))
 		now := strconv.FormatInt(time.Now().UnixMilli(), 10)
 
-		res, err := tokenBucketScript.Run(ctx, global.Redis, []string{key}, capacity, refill, now).Slice()
+		res, err := tokenBucketScript.Run(ctx, rdb, []string{redisKey}, capacity, refill, now).Slice()
 		if err != nil {
 			// Fail-open: Redis lỗi thì cho request đi qua thay vì chặn toàn
 			// bộ hệ thống. Rate limit là lớp bảo vệ, không phải lớp bắt buộc.
 			global.Logger.Warn("rate limit không kiểm tra được, cho request đi qua",
-				zap.String("key", key),
+				zap.String("scope", scope),
+				zap.String("key", redisKey),
 				zap.Error(err),
 			)
 			c.Next()
@@ -104,13 +131,4 @@ func RateLimit() gin.HandlerFunc {
 
 		c.Next()
 	}
-}
-
-// clientKey ưu tiên định danh theo người dùng đã đăng nhập, không có thì
-// rơi về địa chỉ IP.
-func clientKey(c *gin.Context) string {
-	if userID := c.GetString(ContextUserIDKey); userID != "" {
-		return "user:" + userID
-	}
-	return "ip:" + c.ClientIP()
 }

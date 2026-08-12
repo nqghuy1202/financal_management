@@ -22,7 +22,11 @@ func validConfig() Config {
 			AccessTokenTTL:  15 * time.Minute,
 			RefreshTokenTTL: 168 * time.Hour,
 		},
-		RateLimit: RateLimitSetting{Enabled: true, Capacity: 100, RefillPerSecond: 10},
+		RateLimit: RateLimitSetting{
+			IP:    RateLimitRule{Enabled: true, Capacity: 100, RefillPerSecond: 10},
+			User:  RateLimitRule{Enabled: true, Capacity: 300, RefillPerSecond: 30},
+			Login: RateLimitRule{Enabled: true, Capacity: 5, RefillPerSecond: 0.05},
+		},
 	}
 }
 
@@ -72,9 +76,14 @@ func TestConfigValidate_BatLoi(t *testing.T) {
 			wantMsg: "refreshTokenTTL",
 		},
 		{
-			name:    "rate limit bật nhưng capacity bằng 0",
-			modify:  func(c *Config) { c.RateLimit.Capacity = 0 },
-			wantMsg: "rateLimit.capacity",
+			name:    "hạn mức ip bật nhưng capacity bằng 0",
+			modify:  func(c *Config) { c.RateLimit.IP.Capacity = 0 },
+			wantMsg: "rateLimit.ip.capacity",
+		},
+		{
+			name:    "hạn mức login bật nhưng refill bằng 0",
+			modify:  func(c *Config) { c.RateLimit.Login.RefillPerSecond = 0 },
+			wantMsg: "rateLimit.login.refillPerSecond",
 		},
 	}
 
@@ -111,6 +120,17 @@ func TestConfigValidate_GomNhieuLoi(t *testing.T) {
 		if !strings.Contains(err.Error(), want) {
 			t.Errorf("thiếu lỗi %q trong kết quả gộp:\n%v", want, err)
 		}
+	}
+}
+
+// Hạn mức đang tắt thì tham số của nó không cần hợp lệ — nếu không,
+// muốn tắt rate limit sẽ phải điền số giả vào config.
+func TestRateLimitRule_TatThiBoQuaKiemTra(t *testing.T) {
+	cfg := validConfig()
+	cfg.RateLimit.User = RateLimitRule{Enabled: false, Capacity: 0, RefillPerSecond: 0}
+
+	if err := cfg.Validate(); err != nil {
+		t.Errorf("hạn mức đang tắt không nên bị kiểm tra tham số, nhưng lỗi: %v", err)
 	}
 }
 

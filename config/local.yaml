@@ -52,6 +52,18 @@ jwt:
   refreshTokenTTL: 168h # 7 ngày
 
 rateLimit:
-  enabled: true
-  capacity: 100 # cho phép dồn tối đa 100 request
-  refillPerSecond: 10 # duy trì 10 request/giây
+  # Hạn mức toàn cục theo IP, áp cho mọi request kể cả chưa đăng nhập.
+  ip:
+    enabled: true
+    capacity: 100 # cho phép dồn tối đa 100 request
+    refillPerSecond: 10 # duy trì 10 request/giây
+  # Hạn mức theo tài khoản, chỉ áp cho route đã xác thực.
+  user:
+    enabled: true
+    capacity: 300
+    refillPerSecond: 30
+  # Chống dò mật khẩu: 5 lần thử, nạp lại 1 lần mỗi 20 giây.
+  login:
+    enabled: true
+    capacity: 5
+    refillPerSecond: 0.05

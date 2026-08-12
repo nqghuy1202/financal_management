@@ -96,8 +96,26 @@ type JWTSetting struct {
 	RefreshTokenTTL time.Duration `mapstructure:"refreshTokenTTL"`
 }
 
-// RateLimitSetting cấu hình thuật toán token bucket cho rate limit.
+// RateLimitSetting gom các hạn mức cho từng nhóm request.
+//
+// Tách làm ba vì mỗi nhóm có mục tiêu bảo vệ khác nhau, không thể dùng
+// chung một con số:
+//
+//   - IP    chặn client ẩn danh làm ngập hệ thống. Khoá theo địa chỉ IP,
+//     nên phải rộng tay: nhiều người dùng có thể ra internet qua cùng
+//     một IP (mạng công ty, NAT của nhà mạng).
+//   - User  hạn mức của một tài khoản đã đăng nhập. Khoá theo user id nên
+//     chính xác hơn, cho phép nới rộng hơn nhóm IP.
+//   - Login chống dò mật khẩu. Phải rất chặt, vì kẻ tấn công chỉ cần vài
+//     nghìn lần thử là đủ; hạn mức 100 request/phút ở đây là vô nghĩa.
 type RateLimitSetting struct {
+	IP    RateLimitRule `mapstructure:"ip"`
+	User  RateLimitRule `mapstructure:"user"`
+	Login RateLimitRule `mapstructure:"login"`
+}
+
+// RateLimitRule là tham số của thuật toán token bucket.
+type RateLimitRule struct {
 	Enabled bool `mapstructure:"enabled"`
 	// Capacity là số token tối đa trong bucket, tức số request được phép
 	// dồn dập trong một đợt burst.
@@ -105,6 +123,21 @@ type RateLimitSetting struct {
 	// RefillPerSecond là số token được nạp lại mỗi giây, tức tốc độ
 	// request được duy trì ổn định về lâu dài.
 	RefillPerSecond float64 `mapstructure:"refillPerSecond"`
+}
+
+// Validate kiểm tra một hạn mức. name dùng để ghép thông báo lỗi.
+func (r RateLimitRule) Validate(name string) error {
+	if !r.Enabled {
+		return nil
+	}
+	var errs []error
+	if r.Capacity <= 0 {
+		errs = append(errs, fmt.Errorf("rateLimit.%s.capacity phải lớn hơn 0 khi bật", name))
+	}
+	if r.RefillPerSecond <= 0 {
+		errs = append(errs, fmt.Errorf("rateLimit.%s.refillPerSecond phải lớn hơn 0 khi bật", name))
+	}
+	return errors.Join(errs...)
 }
 
 // Validate kiểm tra các giá trị bắt buộc ngay lúc khởi động, để ứng dụng
@@ -142,14 +175,11 @@ func (c *Config) Validate() error {
 	if c.JWT.RefreshTokenTTL <= c.JWT.AccessTokenTTL {
 		errs = append(errs, errors.New("jwt.refreshTokenTTL phải lớn hơn accessTokenTTL"))
 	}
-	if c.RateLimit.Enabled {
-		if c.RateLimit.Capacity <= 0 {
-			errs = append(errs, errors.New("rateLimit.capacity phải lớn hơn 0 khi bật rate limit"))
-		}
-		if c.RateLimit.RefillPerSecond <= 0 {
-			errs = append(errs, errors.New("rateLimit.refillPerSecond phải lớn hơn 0 khi bật rate limit"))
-		}
-	}
+	errs = append(errs,
+		c.RateLimit.IP.Validate("ip"),
+		c.RateLimit.User.Validate("user"),
+		c.RateLimit.Login.Validate("login"),
+	)
 
 	return errors.Join(errs...)
 }

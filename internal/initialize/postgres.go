@@ -16,12 +16,15 @@ import (
 // Dùng pgxpool thay vì database/sql vì pgx là driver native cho Postgres:
 // nhanh hơn, hỗ trợ đầy đủ kiểu dữ liệu của Postgres (numeric, jsonb,
 // array) và là driver mà sqlc sinh code cho ở các phase sau.
-func InitPostgres(ctx context.Context) error {
+//
+// Trả về pool cho nơi gọi thay vì gán vào biến toàn cục, để repo nhận
+// pool qua constructor và test được với database tạm.
+func InitPostgres(ctx context.Context) (*pgxpool.Pool, error) {
 	cfg := global.Config.Postgres
 
 	poolCfg, err := pgxpool.ParseConfig(cfg.DSN())
 	if err != nil {
-		return fmt.Errorf("phân tích DSN postgres thất bại: %w", err)
+		return nil, fmt.Errorf("phân tích DSN postgres thất bại: %w", err)
 	}
 
 	poolCfg.MaxConns = cfg.MaxConns
@@ -32,7 +35,7 @@ func InitPostgres(ctx context.Context) error {
 
 	pool, err := pgxpool.NewWithConfig(ctx, poolCfg)
 	if err != nil {
-		return fmt.Errorf("tạo pool postgres thất bại: %w", err)
+		return nil, fmt.Errorf("tạo pool postgres thất bại: %w", err)
 	}
 
 	// NewWithConfig là lazy — chưa thực sự mở kết nối nào. Ping ở đây để
@@ -41,10 +44,9 @@ func InitPostgres(ctx context.Context) error {
 	defer cancel()
 	if err := pool.Ping(pingCtx); err != nil {
 		pool.Close()
-		return fmt.Errorf("ping postgres thất bại (%s:%d): %w", cfg.Host, cfg.Port, err)
+		return nil, fmt.Errorf("ping postgres thất bại (%s:%d): %w", cfg.Host, cfg.Port, err)
 	}
 
-	global.Postgres = pool
 	global.Logger.Info("đã kết nối PostgreSQL",
 		zap.String("host", cfg.Host),
 		zap.Int("port", cfg.Port),
@@ -52,5 +54,5 @@ func InitPostgres(ctx context.Context) error {
 		zap.Int32("maxConns", cfg.MaxConns),
 	)
 
-	return nil
+	return pool, nil
 }

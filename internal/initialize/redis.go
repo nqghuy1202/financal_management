@@ -14,7 +14,10 @@ import (
 //
 // Redis được dùng cho: lưu refresh token (để revoke được), rate limit,
 // và cache kết quả báo cáo ở các phase sau.
-func InitRedis(ctx context.Context) error {
+//
+// Trả về client cho nơi gọi thay vì gán vào biến toàn cục — xem lý do ở
+// package global.
+func InitRedis(ctx context.Context) (*redis.Client, error) {
 	cfg := global.Config.Redis
 
 	client := redis.NewClient(&redis.Options{
@@ -26,14 +29,13 @@ func InitRedis(ctx context.Context) error {
 
 	if err := client.Ping(ctx).Err(); err != nil {
 		_ = client.Close()
-		return fmt.Errorf("ping redis thất bại (%s): %w", cfg.Addr(), err)
+		return nil, fmt.Errorf("ping redis thất bại (%s): %w", cfg.Addr(), err)
 	}
 
-	global.Redis = client
 	global.Logger.Info("đã kết nối Redis",
 		zap.String("addr", cfg.Addr()),
 		zap.Int("db", cfg.DB),
 	)
 
-	return nil
+	return client, nil
 }

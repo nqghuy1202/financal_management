@@ -1,16 +1,19 @@
-// Package global chứa các đối tượng dùng chung toàn ứng dụng, được khởi
-// tạo một lần duy nhất ở tầng initialize.
+// Package global chứa các đối tượng xuyên suốt toàn ứng dụng, được khởi
+// tạo một lần duy nhất ở tầng initialize và chỉ đọc sau đó.
 //
-// Lưu ý: đây là biến toàn cục nên chỉ được ghi trong quá trình khởi động,
-// sau đó chỉ đọc. Các tầng service và repo nên nhận dependency qua
-// constructor thay vì đọc thẳng biến ở đây, để còn viết test được.
+// Chỉ hai thứ được đặt ở đây: cấu hình và logger. Chúng là mối quan tâm
+// cắt ngang mọi tầng, và truyền chúng qua từng constructor sẽ làm nhiễu
+// chữ ký hàm ở khắp nơi mà không đổi lại được gì.
+//
+// Connection pool của PostgreSQL và client Redis cố tình KHÔNG nằm ở đây.
+// Chúng được tạo trong initialize rồi truyền tường minh xuống repo qua
+// constructor, để tầng repo có thể được test với database tạm mà không
+// phải ghi đè biến toàn cục.
 package global
 
 import (
 	"financal_management/internal/pkg/setting"
 
-	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
 )
 
@@ -18,13 +21,7 @@ var (
 	// Config là cấu hình đã được nạp và validate.
 	Config setting.Config
 
-	// Logger là logger dùng chung. Trước khi InitLogger chạy xong, biến này
-	// là nil — không log gì trước thời điểm đó.
+	// Logger là logger dùng chung. Trước khi InitLogger chạy xong, biến
+	// này là nil — không log gì trước thời điểm đó.
 	Logger *zap.Logger
-
-	// Postgres là connection pool tới PostgreSQL.
-	Postgres *pgxpool.Pool
-
-	// Redis là client tới Redis, dùng cho cache, rate limit và refresh token.
-	Redis *redis.Client
 )

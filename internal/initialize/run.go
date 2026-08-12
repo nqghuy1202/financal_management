@@ -31,20 +31,22 @@ func Run() error {
 	// Đảm bảo log còn nằm trong buffer được ghi xuống đĩa trước khi thoát.
 	defer func() { _ = global.Logger.Sync() }()
 
-	if err := InitPostgres(ctx); err != nil {
+	db, err := InitPostgres(ctx)
+	if err != nil {
 		return err
 	}
-	defer global.Postgres.Close()
+	defer db.Close()
 
-	if err := InitRedis(ctx); err != nil {
+	rdb, err := InitRedis(ctx)
+	if err != nil {
 		return err
 	}
-	defer func() { _ = global.Redis.Close() }()
+	defer func() { _ = rdb.Close() }()
 
 	cfg := global.Config.Server
 	srv := &http.Server{
 		Addr:         fmt.Sprintf(":%d", cfg.Port),
-		Handler:      InitRouter(),
+		Handler:      InitRouter(rdb, buildDeps(db, rdb)),
 		ReadTimeout:  cfg.ReadTimeout,
 		WriteTimeout: cfg.WriteTimeout,
 		IdleTimeout:  cfg.IdleTimeout,
