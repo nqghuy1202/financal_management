@@ -69,6 +69,22 @@ curl http://localhost:8080/readyz    # postgres + redis đã sẵn sàng
 | API | http://localhost:8080 |
 | Kafka UI | http://localhost:8081 |
 | Mailhog (xem email) | http://localhost:8025 |
+| PostgreSQL | localhost:**5433** |
+| Redis | localhost:6379 |
+| Kafka | localhost:9092 |
+
+## Xử lý sự cố
+
+**PostgreSQL dùng cổng 5433 chứ không phải 5432.** Nếu máy đã cài sẵn
+PostgreSQL chạy như một dịch vụ Windows, nó giữ cổng 5432 trên IPv4 còn
+Docker chỉ chiếm được IPv6. Ứng dụng khi đó kết nối trúng PostgreSQL của
+máy thay vì container và báo `password authentication failed`. Dùng cổng
+riêng để hai bên không tranh nhau. Đổi cổng thì phải sửa đồng thời
+`POSTGRES_PORT` trong `.env` và `postgres.port` trong `config/local.yaml`.
+
+**Docker Desktop cần được mở trước khi chạy `make up`** và mất khoảng 2–4
+phút để daemon sẵn sàng. Nếu `docker ps` báo `cannot find the file
+specified` thì daemon chưa lên, chờ thêm chứ chưa phải hỏng.
 
 ## Các lệnh thường dùng
 

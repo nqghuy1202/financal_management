@@ -18,7 +18,9 @@ logger:
 
 postgres:
   host: localhost
-  port: 5432
+  # 5433 chứ không phải 5432: tránh tranh cổng với PostgreSQL cài trực tiếp
+  # trên máy. Phải khớp với POSTGRES_PORT trong .env
+  port: 5433
   user: fintrack
   password: fintrack
   dbName: fintrack
