@@ -174,7 +174,7 @@ func (ac *AccountController) Delete(c *gin.Context) {
 		return
 	}
 
-	response.Success(c, gin.H{"message": "Đã xoá nguồn tiền"})
+	response.Success(c, gin.H{keyMessage: "Đã xoá nguồn tiền"})
 }
 
 func respondAccount(c *gin.Context, account sqlc.Account) {

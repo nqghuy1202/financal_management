@@ -154,7 +154,7 @@ func (ac *AuthController) Logout(c *gin.Context) {
 		return
 	}
 
-	response.Success(c, gin.H{"message": "Đã đăng xuất"})
+	response.Success(c, gin.H{keyMessage: "Đã đăng xuất"})
 }
 
 // Me trả về thông tin tài khoản đang đăng nhập.

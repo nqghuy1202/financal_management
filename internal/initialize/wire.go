@@ -30,10 +30,14 @@ func buildDeps(db *pgxpool.Pool, rdb *redis.Client) routers.Deps {
 	accountRepo := repo.NewAccountRepo(db)
 	accountService := services.NewAccountService(accountRepo)
 
+	categoryRepo := repo.NewCategoryRepo(db)
+	categoryService := services.NewCategoryService(categoryRepo)
+
 	return routers.Deps{
-		Health:  controller.NewHealthController(db, rdb),
-		Auth:    controller.NewAuthController(authService),
-		Account: controller.NewAccountController(accountService),
+		Health:   controller.NewHealthController(db, rdb),
+		Auth:     controller.NewAuthController(authService),
+		Account:  controller.NewAccountController(accountService),
+		Category: controller.NewCategoryController(categoryService),
 
 		RequireAuth: middlewares.RequireAuth(tokenManager),
 		LoginRateLimit: middlewares.RateLimit(

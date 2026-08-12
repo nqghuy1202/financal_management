@@ -13,6 +13,9 @@ import (
 type Querier interface {
 	// Dùng trước khi xoá: nguồn tiền còn giao dịch thì không cho xoá.
 	CountTransactionsByAccount(ctx context.Context, accountID *uuid.UUID) (int64, error)
+	// Dùng trước khi xoá: danh mục còn giao dịch thì không cho xoá, vì xoá đi
+	// sẽ làm các báo cáo cũ mất một phần dữ liệu.
+	CountTransactionsByCategory(ctx context.Context, categoryID *uuid.UUID) (int64, error)
 	// Mọi truy vấn ở đây đều có điều kiện user_id.
 	//
 	// Đây là điểm bảo mật quan trọng nhất của tầng dữ liệu: nếu chỉ lọc theo
@@ -20,18 +23,36 @@ type Querier interface {
 	// sửa được ví đó. Ràng buộc user_id ngay trong câu SQL khiến không handler
 	// nào có thể quên kiểm tra quyền sở hữu.
 	CreateAccount(ctx context.Context, arg CreateAccountParams) (Account, error)
+	CreateCategory(ctx context.Context, arg CreateCategoryParams) (Category, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
 	EmailExists(ctx context.Context, email string) (bool, error)
 	GetAccount(ctx context.Context, arg GetAccountParams) (Account, error)
+	// Đọc được cả danh mục hệ thống lẫn danh mục của chính mình.
+	GetCategory(ctx context.Context, arg GetCategoryParams) (Category, error)
 	// Cột email là citext nên so sánh ở đây tự động không phân biệt hoa
 	// thường, không cần lower() ở hai vế.
 	GetUserByEmail(ctx context.Context, email string) (User, error)
 	GetUserByID(ctx context.Context, id uuid.UUID) (User, error)
 	ListAccounts(ctx context.Context, userID uuid.UUID) ([]Account, error)
+	// Danh mục có hai loại sống chung trong một bảng:
+	//   user_id IS NULL  → danh mục hệ thống, mọi người dùng đều thấy
+	//   user_id có giá trị → danh mục riêng của người đó
+	//
+	// Quy tắc: ai cũng ĐỌC được danh mục hệ thống, nhưng chỉ SỬA/XOÁ được
+	// danh mục của chính mình. Quy tắc đó được cài đặt bằng điều kiện WHERE
+	// chứ không phải bằng if trong Go: câu UPDATE và DELETE dùng
+	// `user_id = @user_id`, mà danh mục hệ thống có user_id NULL nên không
+	// bao giờ khớp — tự động được bảo vệ.
+	// Danh mục hệ thống hiện trước, sau đó xếp theo tên.
+	ListCategories(ctx context.Context, arg ListCategoriesParams) ([]Category, error)
 	MarkEmailVerified(ctx context.Context, id uuid.UUID) error
 	// Xoá mềm để các giao dịch cũ vẫn tham chiếu được tới ví này.
 	SoftDeleteAccount(ctx context.Context, arg SoftDeleteAccountParams) (Account, error)
+	SoftDeleteCategory(ctx context.Context, arg SoftDeleteCategoryParams) (Category, error)
 	UpdateAccount(ctx context.Context, arg UpdateAccountParams) (Account, error)
+	// Chỉ sửa được danh mục của chính mình: danh mục hệ thống có user_id
+	// NULL nên điều kiện dưới đây không bao giờ khớp.
+	UpdateCategory(ctx context.Context, arg UpdateCategoryParams) (Category, error)
 	UpdateUserPassword(ctx context.Context, arg UpdateUserPasswordParams) error
 	UpdateUserProfile(ctx context.Context, arg UpdateUserProfileParams) (User, error)
 }

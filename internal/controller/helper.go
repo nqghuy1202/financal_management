@@ -8,6 +8,9 @@ import (
 	"github.com/google/uuid"
 )
 
+// keyMessage là khoá JSON cho các response chỉ trả về một lời nhắn.
+const keyMessage = "message"
+
 // currentUserID lấy id người dùng đã đăng nhập từ context.
 //
 // Chỉ dùng được trong handler nằm sau middleware RequireAuth. Trả về
