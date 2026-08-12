@@ -37,7 +37,7 @@ func TestWrap_GiuLoiGoc(t *testing.T) {
 	if !errors.Is(wrapped, sentinel) {
 		t.Error("errors.Is không tìm thấy lỗi gốc bên trong AppError")
 	}
-	if wrapped.Cause() != sentinel {
+	if !errors.Is(wrapped.Cause(), sentinel) {
 		t.Errorf("Cause() = %v, mong đợi %v", wrapped.Cause(), sentinel)
 	}
 }

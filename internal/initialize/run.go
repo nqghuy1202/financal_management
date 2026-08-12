@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"os/signal"
 	"syscall"
-	"time"
 
 	"financal_management/global"
 
@@ -80,9 +79,9 @@ func Run() error {
 		return fmt.Errorf("tắt server không sạch sau %s: %w", cfg.ShutdownTimeout, err)
 	}
 
+	// Sau khi return, các defer bên trên chạy theo thứ tự ngược: đóng
+	// Redis, đóng pool Postgres, cuối cùng flush log xuống đĩa.
 	global.Logger.Info("server đã dừng", zap.Duration("shutdownTimeout", cfg.ShutdownTimeout))
-	// Cho các defer bên trên (đóng pool, flush log) kịp chạy.
-	time.Sleep(100 * time.Millisecond)
 
 	return nil
 }

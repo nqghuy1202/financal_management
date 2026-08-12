@@ -4,12 +4,11 @@ run:
   timeout: 5m
 
 linters:
+  # standard = errcheck, govet, ineffassign, staticcheck, unused.
+  # Các linter bên dưới được bật thêm ngoài bộ đó.
+  default: standard
   enable:
     # Bắt lỗi thật
-    - errcheck # lỗi trả về bị bỏ qua
-    - govet
-    - staticcheck
-    - ineffassign # gán giá trị rồi không dùng
     - bodyclose # response.Body không được đóng
     - rowserrcheck # sql.Rows.Err() không được kiểm tra
     - sqlclosecheck # sql.Rows/Stmt không được đóng
@@ -19,7 +18,6 @@ linters:
     - noctx # gọi HTTP không kèm context
 
     # Chất lượng code
-    - unused
     - revive
     - misspell
     - unconvert # ép kiểu thừa
@@ -30,29 +28,33 @@ linters:
     # Bảo mật
     - gosec
 
+  settings:
+    revive:
+      rules:
+        - name: exported
+          disabled: true # chưa bắt buộc doc comment cho mọi hàm export
+    gosec:
+      excludes:
+        - G404 # math/rand: chỉ dùng cho jitter khi retry, không dùng cho bảo mật
+
+  exclusions:
+    rules:
+      # File test được nới lỏng vài luật cho gọn.
+      - path: _test\.go
+        linters:
+          - gosec
+          - errcheck
+          - goconst
+
 formatters:
   enable:
     - gofmt
     - goimports
-
-linters-settings:
-  goimports:
-    local-prefixes: financal_management
-  revive:
-    rules:
-      - name: exported
-        disabled: true # chưa bắt buộc doc comment cho mọi hàm export
-  gosec:
-    excludes:
-      - G404 # math/rand: chỉ dùng cho jitter khi retry, không dùng cho bảo mật
+  settings:
+    goimports:
+      local-prefixes:
+        - financal_management
 
 issues:
-  exclude-rules:
-    # File test được nới lỏng vài luật cho gọn.
-    - path: _test\.go
-      linters:
-        - gosec
-        - errcheck
-        - goconst
   max-issues-per-linter: 0
   max-same-issues: 0

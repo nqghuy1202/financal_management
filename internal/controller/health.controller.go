@@ -12,6 +12,12 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
+// Khoá dùng lặp lại trong payload JSON của các endpoint health.
+const (
+	keyStatus = "status"
+	statusUp  = "up"
+)
+
 // HealthController phục vụ các endpoint kiểm tra tình trạng ứng dụng.
 //
 // Nhận thẳng pool và client thay vì đi qua service/repo, vì đây là
@@ -32,7 +38,7 @@ func NewHealthController(db *pgxpool.Pool, rdb *redis.Client) *HealthController 
 // dependency ở đây, vì nếu DB sập mà probe này fail thì orchestrator sẽ
 // restart ứng dụng một cách vô ích.
 func (hc *HealthController) Live(c *gin.Context) {
-	response.Success(c, gin.H{"status": "alive"})
+	response.Success(c, gin.H{keyStatus: "alive"})
 }
 
 // Ready kiểm tra ứng dụng có sẵn sàng nhận traffic hay không.
@@ -50,27 +56,27 @@ func (hc *HealthController) Ready(c *gin.Context) {
 	healthy := true
 
 	if err := hc.db.Ping(ctx); err != nil {
-		checks["postgres"] = gin.H{"status": "down", "error": err.Error()}
+		checks["postgres"] = gin.H{keyStatus: "down", "error": err.Error()}
 		healthy = false
 	} else {
-		checks["postgres"] = gin.H{"status": "up"}
+		checks["postgres"] = gin.H{keyStatus: statusUp}
 	}
 
 	if err := hc.redis.Ping(ctx).Err(); err != nil {
-		checks["redis"] = gin.H{"status": "down", "error": err.Error()}
+		checks["redis"] = gin.H{keyStatus: "down", "error": err.Error()}
 		healthy = false
 	} else {
-		checks["redis"] = gin.H{"status": "up"}
+		checks["redis"] = gin.H{keyStatus: statusUp}
 	}
 
 	if !healthy {
 		c.JSON(http.StatusServiceUnavailable, response.ResponseData{
 			Code:    response.CodeDependencyUnavailable,
 			Message: response.Message(response.CodeDependencyUnavailable),
-			Data:    gin.H{"status": "not_ready", "checks": checks},
+			Data:    gin.H{keyStatus: "not_ready", "checks": checks},
 		})
 		return
 	}
 
-	response.Success(c, gin.H{"status": "ready", "checks": checks})
+	response.Success(c, gin.H{keyStatus: "ready", "checks": checks})
 }

@@ -61,7 +61,9 @@ func writeSyncer(cfg setting.LoggerSetting) (zapcore.WriteSyncer, error) {
 	syncers := []zapcore.WriteSyncer{zapcore.AddSync(os.Stdout)}
 
 	if cfg.FileName != "" {
-		if err := os.MkdirAll(filepath.Dir(cfg.FileName), 0o755); err != nil {
+		// 0750: chỉ owner và group đọc được. Log có thể chứa thông tin
+		// nhạy cảm nên không mở quyền đọc cho mọi user trên máy.
+		if err := os.MkdirAll(filepath.Dir(cfg.FileName), 0o750); err != nil {
 			return nil, fmt.Errorf("tạo thư mục log thất bại: %w", err)
 		}
 		// lumberjack tự xoay vòng file khi vượt MaxSize, giữ lại MaxBackups
