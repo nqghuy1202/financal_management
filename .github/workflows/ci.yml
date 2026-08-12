@@ -56,6 +56,8 @@ jobs:
 
       # -race bắt data race, thứ mà test thường không phát hiện được bằng
       # mắt thường — đặc biệt quan trọng khi có worker chạy song song.
+      # Chỉ chạy được ở đây vì runner Linux có sẵn gcc; máy dev Windows
+      # thường không có nên `make test` ở local bỏ cờ này.
       - name: Chạy test
         run: go test -short -race -coverprofile=coverage.out -covermode=atomic ./...
 

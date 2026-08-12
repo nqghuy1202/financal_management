@@ -89,12 +89,13 @@ specified` thì daemon chưa lên, chờ thêm chứ chưa phải hỏng.
 ## Các lệnh thường dùng
 
 ```bash
-make help    # xem toàn bộ lệnh
-make watch   # chạy API với live reload
-make test    # unit test (không cần docker)
-make itest   # integration test (cần docker)
-make check   # fmt + vet + lint + test, chạy trước khi commit
-make down    # dừng hạ tầng
+make help       # xem toàn bộ lệnh
+make watch      # chạy API với live reload
+make test       # unit test (không cần docker)
+make test-race  # unit test kèm race detector (cần gcc/cgo)
+make itest      # integration test (cần docker)
+make check      # fmt + vet + lint + test, chạy trước khi commit
+make down       # dừng hạ tầng
 ```
 
 ## Cấu trúc thư mục

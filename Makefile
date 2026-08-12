@@ -65,11 +65,17 @@ lint: ## Chạy golangci-lint
 
 .PHONY: test
 test: ## Chạy unit test (nhanh, không cần docker)
+	go test -short -cover ./...
+
+# -race cần cgo, mà cgo cần trình biên dịch C. Trên Windows thường không
+# có sẵn gcc nên tách riêng: local dùng `test`, CI dùng `test-race`.
+.PHONY: test-race
+test-race: ## Chạy unit test kèm race detector (cần gcc/cgo)
 	go test -short -race -cover ./...
 
 .PHONY: itest
 itest: ## Chạy integration test (cần docker chạy sẵn)
-	go test -race -count=1 -tags=integration ./...
+	go test -count=1 -tags=integration ./...
 
 .PHONY: cover
 cover: ## Chạy test và mở báo cáo coverage
