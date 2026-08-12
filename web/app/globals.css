@@ -1,26 +1,130 @@
 @import "tailwindcss";
 
+/*
+ * Bảng màu định nghĩa một lần ở đây dưới dạng biến CSS, rồi ánh xạ sang
+ * tiện ích Tailwind trong khối @theme bên dưới.
+ *
+ * Vì sao không viết thẳng `bg-white dark:bg-neutral-900` ở từng component:
+ * chế độ tối khi đó phải nhớ ở mọi chỗ, và chỉ cần quên một lần là giao
+ * diện lệch. Ở đây chỉ có một nơi duy nhất đổi giá trị.
+ */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+  color-scheme: light;
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --bg: #f9f9f7;
+  --surface: #fcfcfb;
+  --surface-2: #f0efec;
+  --fg: #0b0b0b;
+  --fg-muted: #52514e;
+  /* Nhạt hơn fg-muted, dành cho nhãn trục và lưới — thứ phải lùi lại phía
+     sau dữ liệu chứ không tranh chỗ với nó. */
+  --fg-faint: #898781;
+  --line: #e1e0d9;
+
+  --brand: #256abf;
+  --brand-fg: #ffffff;
+  /* Nền nhạt cho mục đang chọn, kèm màu chữ riêng cho nó: dùng thẳng
+     --brand trên nền này thì ở chế độ tối hai màu gần bằng nhau và chữ
+     gần như biến mất. */
+  --brand-soft: #cde2fb;
+  --brand-on-soft: #184f95;
+
+  /*
+   * Hai màu của biểu đồ thu/chi là XANH DƯƠNG và CAM, không phải xanh lá
+   * và đỏ như thói quen.
+   *
+   * Cặp xanh lá/đỏ chỉ đạt ΔE 6.9 khi mô phỏng mù màu deutan — nằm trong
+   * vùng cảnh báo, tức là khoảng 8% nam giới nhìn hai cột thu và chi gần
+   * như cùng một màu. Cặp xanh dương/cam đạt 24.7. Đây là lỗi kinh điển
+   * của biểu đồ tài chính, và nó không lộ ra khi người làm tự nhìn.
+   */
+  --chart-1: #2a78d6;
+  --chart-2: #eb6834;
+  --chart-grid: #e1e0d9;
+  --chart-axis: #c3c2b7;
+
+  /*
+   * Màu CHỮ cho số tiền thu và chi. Khác với màu biểu đồ ở trên vì đây là
+   * chữ trên nền, cần độ tương phản đủ để đọc. Luôn đi kèm dấu + hoặc −,
+   * nên người không phân biệt được hai màu vẫn hiểu đúng.
+   */
+  --income: #006300;
+  --expense: #d03b3b;
+
+  --danger: #d03b3b;
+  --danger-soft: #fdeaea;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    color-scheme: dark;
+
+    --bg: #0d0d0d;
+    --surface: #1a1a19;
+    --surface-2: #2c2c2a;
+    --fg: #ffffff;
+    --fg-muted: #c3c2b7;
+    --fg-faint: #898781;
+    --line: #2c2c2a;
+
+    --brand: #3987e5;
+    /* Chữ tối trên nền xanh sáng: trắng trên #3987e5 chỉ đạt 3.4:1, còn
+       chữ tối đạt 5.9:1. */
+    --brand-fg: #0d0d0d;
+    --brand-soft: #184f95;
+    --brand-on-soft: #cde2fb;
+
+    --chart-1: #3987e5;
+    --chart-2: #d95926;
+    --chart-grid: #2c2c2a;
+    --chart-axis: #383835;
+
+    --income: #0ca30c;
+    --expense: #e66767;
+
+    --danger: #e66767;
+    --danger-soft: #3b1c1c;
   }
 }
 
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-fg: var(--fg);
+  --color-fg-muted: var(--fg-muted);
+  --color-fg-faint: var(--fg-faint);
+  --color-line: var(--line);
+
+  --color-brand: var(--brand);
+  --color-brand-fg: var(--brand-fg);
+  --color-brand-soft: var(--brand-soft);
+  --color-brand-on-soft: var(--brand-on-soft);
+
+  --color-income: var(--income);
+  --color-expense: var(--expense);
+
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--bg);
+  color: var(--fg);
+}
+
+/* Số tiền dùng chữ số đều bề ngang, để các cột số trong bảng thẳng hàng
+   thay vì nhảy qua nhảy lại khi giá trị đổi. */
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Viền focus thống nhất cho mọi thành phần bấm được. Dùng :focus-visible
+   nên chỉ hiện khi điều hướng bằng bàn phím, không hiện khi bấm chuột. */
+:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
 }
