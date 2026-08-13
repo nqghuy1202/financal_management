@@ -22,6 +22,9 @@ tmp/
 .vscode
 .idea
 
+# Claude Code local tooling / skills (not app code)
+.claude/
+
 # .env file
 .env
 

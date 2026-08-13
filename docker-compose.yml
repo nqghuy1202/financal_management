@@ -1,4 +1,27 @@
 services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "${PORT:-8080}:8080"
+    environment:
+      PORT: 8080
+      GIN_MODE: release
+      STATIC_DIR: ./frontend/dist
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:8080}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required — set it in .env}
+      # DB connection (for when real API endpoints are wired up)
+      BLUEPRINT_DB_HOST: mysql_bp
+      BLUEPRINT_DB_PORT: 3306
+      BLUEPRINT_DB_DATABASE: ${BLUEPRINT_DB_DATABASE}
+      BLUEPRINT_DB_USERNAME: ${BLUEPRINT_DB_USERNAME}
+      BLUEPRINT_DB_PASSWORD: ${BLUEPRINT_DB_PASSWORD}
+    depends_on:
+      mysql_bp:
+        condition: service_healthy
+
   mysql_bp:
     image: mysql:latest
     restart: unless-stopped
@@ -11,6 +34,12 @@ services:
       - "${BLUEPRINT_DB_PORT}:3306"
     volumes:
       - mysql_volume_bp:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-p${BLUEPRINT_DB_ROOT_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
 volumes:
   mysql_volume_bp:

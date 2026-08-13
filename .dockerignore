@@ -1,0 +1,28 @@
+# Git / IDE
+.git
+.gitignore
+.vscode
+.idea
+.claude
+
+# Go build artifacts
+main.exe
+main
+*.exe
+*.test
+*.out
+tmp/
+log/
+
+# Frontend build artifacts & deps (rebuilt inside the image)
+frontend/node_modules
+frontend/dist
+frontend/dev.log
+frontend/dev.err.log
+
+# Env & secrets
+.env
+
+# Docs / misc
+img/
+*.md
