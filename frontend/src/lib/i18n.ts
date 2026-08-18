@@ -53,7 +53,7 @@ const vi: Dict = {
 
   // hero
   'hero.title': 'Nắm rõ dòng tiền,\nlàm chủ tương lai.',
-  'hero.subtitle': 'Theo dõi thu chi, lập ngân sách và trực quan hóa tài chính cá nhân của bạn — tất cả trong một nơi.',
+  'hero.subtitle': 'Theo dõi thu chi, lập ngân sách và trực quan hóa tài chính cá nhân của bạn - tất cả trong một nơi.',
   'hero.f1': 'Ghi lại mọi giao dịch chỉ trong vài giây',
   'hero.f2': 'Biểu đồ trực quan theo thời gian thực',
   'hero.f3': 'Dữ liệu của bạn được lưu an toàn',
@@ -105,7 +105,7 @@ const vi: Dict = {
   'tx.subtotal': 'Tạm tính',
   'tx.txCount': '{n} giao dịch',
   'tx.grandTotal': 'Tổng cộng',
-  'tx.grandTotalHint': '(Thu − Chi)',
+  'tx.grandTotalHint': '(Thu - Chi)',
   'tx.empty': 'Không tìm thấy giao dịch',
   'tx.emptyHint': 'Thử thay đổi tùy chọn tìm kiếm hoặc thêm giao dịch mới.',
 
@@ -122,7 +122,7 @@ const vi: Dict = {
 
   // budgets
   'bud.title': 'Ngân sách',
-  'bud.subtitle': '{month} — theo dõi hạn mức chi tiêu.',
+  'bud.subtitle': '{month} - theo dõi hạn mức chi tiêu.',
   'bud.categoryBtn': 'Danh mục',
   'bud.setBudget': 'Đặt ngân sách',
   'bud.totalThisMonth': 'Tổng ngân sách tháng này',
@@ -206,11 +206,11 @@ const en: Dict = {
   'err.registerFail': 'Registration failed',
 
   'hero.title': 'Know your cash flow,\nown your future.',
-  'hero.subtitle': 'Track income & expenses, set budgets, and visualize your personal finances — all in one place.',
+  'hero.subtitle': 'Track income & expenses, set budgets, and visualize your personal finances - all in one place.',
   'hero.f1': 'Record any transaction in seconds',
   'hero.f2': 'Real-time visual charts',
   'hero.f3': 'Your data is stored securely',
-  'hero.footer': '© 2026 HL Company — Personal finance manager',
+  'hero.footer': '© 2026 HL Company - Personal finance manager',
 
   'dash.title': 'Overview',
   'dash.subtitle': 'Your finances for this month.',
@@ -256,7 +256,7 @@ const en: Dict = {
   'tx.subtotal': 'Subtotal',
   'tx.txCount': '{n} transactions',
   'tx.grandTotal': 'Total',
-  'tx.grandTotalHint': '(In − Out)',
+  'tx.grandTotalHint': '(In - Out)',
   'tx.empty': 'No transactions found',
   'tx.emptyHint': 'Try changing the search options or add a new transaction.',
 
@@ -271,7 +271,7 @@ const en: Dict = {
   'err.pickCategory': 'Please select a category',
 
   'bud.title': 'Budgets',
-  'bud.subtitle': '{month} — track your spending limits.',
+  'bud.subtitle': '{month} - track your spending limits.',
   'bud.categoryBtn': 'Categories',
   'bud.setBudget': 'Set budget',
   'bud.totalThisMonth': 'Total budget this month',

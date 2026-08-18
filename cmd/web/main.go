@@ -71,7 +71,7 @@ func main() {
 		}
 		secretStr := os.Getenv("JWT_SECRET")
 		if secretStr == "" || strings.Contains(secretStr, "dev-secret") || strings.Contains(secretStr, "change-me") {
-			log.Println("WARNING: JWT_SECRET yếu/mặc định — ĐẶT một chuỗi bí mật mạnh cho production!")
+			log.Println("WARNING: JWT_SECRET yếu/mặc định - ĐẶT một chuỗi bí mật mạnh cho production!")
 			if secretStr == "" {
 				secretStr = "dev-secret-change-me"
 			}
