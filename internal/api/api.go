@@ -32,6 +32,8 @@ type Handler struct {
 	transactions *TransactionRepo
 	budgets      *BudgetRepo
 	incomes      *IncomeRepo
+	fixedCosts   *FixedCostRepo
+	settings     *SettingsRepo
 }
 
 func NewHandler(db *sql.DB, secret []byte) *Handler {
@@ -43,6 +45,8 @@ func NewHandler(db *sql.DB, secret []byte) *Handler {
 		transactions: NewTransactionRepo(db),
 		budgets:      NewBudgetRepo(db),
 		incomes:      NewIncomeRepo(db),
+		fixedCosts:   NewFixedCostRepo(db),
+		settings:     NewSettingsRepo(db),
 	}
 }
 
@@ -105,6 +109,22 @@ type Income struct {
 	ID             string `json:"id"`
 	CycleStartDate string `json:"cycleStartDate"` // yyyy-mm-dd
 	Amount         int64  `json:"amount"`
+}
+
+// FixedCost is a recurring committed cost (rent, subscriptions, ...). It is a
+// live list — not snapshotted per cycle.
+type FixedCost struct {
+	ID     string `json:"id"`
+	Name   string `json:"name"`
+	Amount int64  `json:"amount"`
+}
+
+// Settings holds a user's 1:1 account settings. cycle_start_day exists with
+// its default (1) but stays unused/unedited until Story 1.4 wires
+// PUT /cycle-settings — this story only reads/writes savings_goal.
+type Settings struct {
+	SavingsGoal   int64 `json:"savingsGoal"`
+	CycleStartDay int   `json:"cycleStartDay"`
 }
 
 // ---- response helpers ----

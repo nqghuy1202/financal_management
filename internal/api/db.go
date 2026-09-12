@@ -92,6 +92,23 @@ func Migrate(db *sql.DB) error {
 			UNIQUE KEY uq_income (user_id, cycle_start_date),
 			CONSTRAINT fk_income_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+
+		`CREATE TABLE IF NOT EXISTS fixed_costs (
+			id         CHAR(36)     NOT NULL PRIMARY KEY,
+			user_id    CHAR(36)     NOT NULL,
+			name       VARCHAR(120) NOT NULL,
+			amount     BIGINT       NOT NULL,
+			created_at TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			INDEX idx_fixed_costs_user (user_id),
+			CONSTRAINT fk_fixed_costs_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+
+		`CREATE TABLE IF NOT EXISTS user_settings (
+			user_id         CHAR(36) NOT NULL PRIMARY KEY,
+			savings_goal    BIGINT   NOT NULL DEFAULT 0,
+			cycle_start_day TINYINT  NOT NULL DEFAULT 1,
+			CONSTRAINT fk_user_settings_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
 	}
 	for _, s := range stmts {
 		if _, err := db.Exec(s); err != nil {
