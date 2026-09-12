@@ -6,18 +6,64 @@
 package api
 
 import (
+	"context"
 	"database/sql"
 
 	"github.com/gin-gonic/gin"
 )
 
+// dbtx is the subset of *sql.DB / *sql.Tx that repositories depend on. Every
+// repository takes one of these instead of a concrete *sql.DB, so the exact
+// same repository code can run standalone or inside a transaction — pass a
+// *sql.Tx (via withTx) when a handler needs several writes to commit or fail
+// together.
+type dbtx interface {
+	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
+	QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
+	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
+}
+
 type Handler struct {
 	db     *sql.DB
 	secret []byte
+
+	users        *UserRepo
+	categories   *CategoryRepo
+	transactions *TransactionRepo
+	budgets      *BudgetRepo
 }
 
 func NewHandler(db *sql.DB, secret []byte) *Handler {
-	return &Handler{db: db, secret: secret}
+	return &Handler{
+		db:           db,
+		secret:       secret,
+		users:        NewUserRepo(db),
+		categories:   NewCategoryRepo(db),
+		transactions: NewTransactionRepo(db),
+		budgets:      NewBudgetRepo(db),
+	}
+}
+
+// withTx runs fn inside a single database transaction: fn's writes all
+// commit together, or all roll back if fn (or the commit itself) fails.
+// Build repositories over the *sql.Tx passed to fn (e.g. NewUserRepo(tx)) so
+// their queries participate in the same transaction.
+func (h *Handler) withTx(ctx context.Context, fn func(tx *sql.Tx) error) error {
+	tx, err := h.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if p := recover(); p != nil {
+			tx.Rollback()
+			panic(p)
+		}
+	}()
+	if err := fn(tx); err != nil {
+		tx.Rollback()
+		return err
+	}
+	return tx.Commit()
 }
 
 // ---- domain models (JSON matches the frontend types) ----
@@ -29,9 +75,9 @@ type User struct {
 }
 
 type Category struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
-	Type string `json:"type"` // income | expense
+	ID    string `json:"id"`
+	Name  string `json:"name"`
+	Type  string `json:"type"` // income | expense
 	Color string `json:"color"`
 	Icon  string `json:"icon"`
 }

@@ -1,7 +1,6 @@
 package api
 
 import (
-	"database/sql"
 	"net/http"
 	"strings"
 	"time"
@@ -9,8 +8,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
-
-const dateLayout = "2006-01-02"
 
 type transactionInput struct {
 	Type       string `json:"type"`
@@ -34,27 +31,10 @@ func (in transactionInput) validate() bool {
 }
 
 func (h *Handler) ListTransactions(c *gin.Context) {
-	rows, err := h.db.Query(
-		`SELECT id, type, amount, COALESCE(category_id, ''), note, date
-		 FROM transactions WHERE user_id = ? ORDER BY date DESC, created_at DESC`,
-		userIDFrom(c),
-	)
+	list, err := h.transactions.List(c.Request.Context(), userIDFrom(c))
 	if err != nil {
 		fail(c, http.StatusInternalServerError, 50020, "Không thể tải giao dịch")
 		return
-	}
-	defer rows.Close()
-
-	list := make([]Transaction, 0)
-	for rows.Next() {
-		var t Transaction
-		var d time.Time
-		if err := rows.Scan(&t.ID, &t.Type, &t.Amount, &t.CategoryID, &t.Note, &d); err != nil {
-			fail(c, http.StatusInternalServerError, 50021, "Lỗi đọc giao dịch")
-			return
-		}
-		t.Date = d.Format(dateLayout)
-		list = append(list, t)
 	}
 	ok(c, list)
 }
@@ -65,8 +45,15 @@ func (h *Handler) CreateTransaction(c *gin.Context) {
 		fail(c, http.StatusBadRequest, 40020, "Dữ liệu giao dịch không hợp lệ")
 		return
 	}
+	ctx := c.Request.Context()
 	uid := userIDFrom(c)
-	if !h.ownsCategory(uid, in.CategoryID) {
+
+	owns, err := h.categories.Owns(ctx, uid, in.CategoryID)
+	if err != nil {
+		fail(c, http.StatusInternalServerError, 50025, "Lỗi máy chủ")
+		return
+	}
+	if !owns {
 		fail(c, http.StatusBadRequest, 40021, "Danh mục không tồn tại")
 		return
 	}
@@ -79,11 +66,7 @@ func (h *Handler) CreateTransaction(c *gin.Context) {
 		Note:       strings.TrimSpace(in.Note),
 		Date:       in.Date,
 	}
-	if _, err := h.db.Exec(
-		`INSERT INTO transactions (id, user_id, type, amount, category_id, note, date)
-		 VALUES (?, ?, ?, ?, ?, ?, ?)`,
-		t.ID, uid, t.Type, t.Amount, t.CategoryID, t.Note, t.Date,
-	); err != nil {
+	if err := h.transactions.Create(ctx, uid, t); err != nil {
 		fail(c, http.StatusInternalServerError, 50022, "Không thể tạo giao dịch")
 		return
 	}
@@ -96,44 +79,37 @@ func (h *Handler) UpdateTransaction(c *gin.Context) {
 		fail(c, http.StatusBadRequest, 40022, "Dữ liệu giao dịch không hợp lệ")
 		return
 	}
+	ctx := c.Request.Context()
 	uid := userIDFrom(c)
 	id := c.Param("id")
-	if !h.ownsCategory(uid, in.CategoryID) {
+
+	owns, err := h.categories.Owns(ctx, uid, in.CategoryID)
+	if err != nil {
+		fail(c, http.StatusInternalServerError, 50026, "Lỗi máy chủ")
+		return
+	}
+	if !owns {
 		fail(c, http.StatusBadRequest, 40023, "Danh mục không tồn tại")
 		return
 	}
 
-	res, err := h.db.Exec(
-		`UPDATE transactions SET type = ?, amount = ?, category_id = ?, note = ?, date = ?
-		 WHERE id = ? AND user_id = ?`,
-		in.Type, in.Amount, in.CategoryID, strings.TrimSpace(in.Note), in.Date, id, uid,
-	)
+	t := Transaction{ID: id, Type: in.Type, Amount: in.Amount, CategoryID: in.CategoryID, Note: strings.TrimSpace(in.Note), Date: in.Date}
+	found, err := h.transactions.Update(ctx, uid, id, t)
 	if err != nil {
 		fail(c, http.StatusInternalServerError, 50023, "Không thể cập nhật giao dịch")
 		return
 	}
-	if n, _ := res.RowsAffected(); n == 0 {
+	if !found {
 		fail(c, http.StatusNotFound, 40420, "Không tìm thấy giao dịch")
 		return
 	}
-	ok(c, Transaction{ID: id, Type: in.Type, Amount: in.Amount, CategoryID: in.CategoryID, Note: strings.TrimSpace(in.Note), Date: in.Date})
+	ok(c, t)
 }
 
 func (h *Handler) DeleteTransaction(c *gin.Context) {
-	if _, err := h.db.Exec(
-		`DELETE FROM transactions WHERE id = ? AND user_id = ?`,
-		c.Param("id"), userIDFrom(c),
-	); err != nil {
+	if err := h.transactions.Delete(c.Request.Context(), userIDFrom(c), c.Param("id")); err != nil {
 		fail(c, http.StatusInternalServerError, 50024, "Không thể xóa giao dịch")
 		return
 	}
 	ok(c, gin.H{"deleted": true})
-}
-
-func (h *Handler) ownsCategory(userID, categoryID string) bool {
-	var one int
-	err := h.db.QueryRow(
-		`SELECT 1 FROM categories WHERE id = ? AND user_id = ?`, categoryID, userID,
-	).Scan(&one)
-	return err != sql.ErrNoRows && one == 1
 }

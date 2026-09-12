@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"net/http"
@@ -78,6 +79,8 @@ type credentials struct {
 }
 
 func (h *Handler) RegisterUser(c *gin.Context) {
+	ctx := c.Request.Context()
+
 	var in credentials
 	if err := c.ShouldBindJSON(&in); err != nil {
 		fail(c, http.StatusBadRequest, 40000, "Dữ liệu không hợp lệ")
@@ -90,9 +93,12 @@ func (h *Handler) RegisterUser(c *gin.Context) {
 		return
 	}
 
-	var exists int
-	_ = h.db.QueryRow(`SELECT 1 FROM users WHERE email = ?`, in.Email).Scan(&exists)
-	if exists == 1 {
+	exists, err := h.users.EmailExists(ctx, in.Email)
+	if err != nil {
+		fail(c, http.StatusInternalServerError, 50006, "Lỗi máy chủ")
+		return
+	}
+	if exists {
 		fail(c, http.StatusConflict, 40900, "Email đã được đăng ký")
 		return
 	}
@@ -103,24 +109,28 @@ func (h *Handler) RegisterUser(c *gin.Context) {
 		return
 	}
 
-	id := uuid.NewString()
-	if _, err := h.db.Exec(
-		`INSERT INTO users (id, name, email, password_hash) VALUES (?, ?, ?, ?)`,
-		id, in.Name, in.Email, string(hash),
-	); err != nil {
+	u := User{ID: uuid.NewString(), Name: in.Name, Email: in.Email}
+
+	// Create the user and seed their starter categories atomically: if
+	// seeding fails partway through, the whole signup rolls back instead of
+	// leaving a user account with no (or half of the) categories.
+	err = h.withTx(ctx, func(tx *sql.Tx) error {
+		if err := NewUserRepo(tx).Create(ctx, u, string(hash)); err != nil {
+			return err
+		}
+		return NewCategoryRepo(tx).SeedDefaults(ctx, u.ID)
+	})
+	if err != nil {
 		fail(c, http.StatusInternalServerError, 50001, "Không thể tạo tài khoản")
 		return
 	}
 
-	if err := h.seedDefaultCategories(id); err != nil {
-		// non-fatal: account is created; categories can be added manually
-		_ = err
-	}
-
-	h.respondWithToken(c, User{ID: id, Name: in.Name, Email: in.Email})
+	h.respondWithToken(c, u)
 }
 
 func (h *Handler) Login(c *gin.Context) {
+	ctx := c.Request.Context()
+
 	var in credentials
 	if err := c.ShouldBindJSON(&in); err != nil {
 		fail(c, http.StatusBadRequest, 40000, "Dữ liệu không hợp lệ")
@@ -128,11 +138,7 @@ func (h *Handler) Login(c *gin.Context) {
 	}
 	in.Email = strings.ToLower(strings.TrimSpace(in.Email))
 
-	var u User
-	var hash string
-	err := h.db.QueryRow(
-		`SELECT id, name, email, password_hash FROM users WHERE email = ?`, in.Email,
-	).Scan(&u.ID, &u.Name, &u.Email, &hash)
+	u, hash, err := h.users.FindByEmail(ctx, in.Email)
 	if errors.Is(err, sql.ErrNoRows) || bcrypt.CompareHashAndPassword([]byte(hash), []byte(in.Password)) != nil {
 		fail(c, http.StatusUnauthorized, 40102, "Email hoặc mật khẩu không đúng")
 		return
@@ -145,10 +151,7 @@ func (h *Handler) Login(c *gin.Context) {
 }
 
 func (h *Handler) Me(c *gin.Context) {
-	var u User
-	err := h.db.QueryRow(
-		`SELECT id, name, email FROM users WHERE id = ?`, userIDFrom(c),
-	).Scan(&u.ID, &u.Name, &u.Email)
+	u, err := h.users.FindByID(c.Request.Context(), userIDFrom(c))
 	if err != nil {
 		fail(c, http.StatusUnauthorized, 40103, "Phiên đăng nhập không hợp lệ")
 		return
@@ -167,7 +170,12 @@ func (h *Handler) respondWithToken(c *gin.Context, u User) {
 
 // Demo creates a fresh throwaway account pre-filled with sample data and logs
 // straight in — one click for recruiters/visitors, no form, isolated per click.
+// The whole account (user + categories + sample data) is created in a single
+// transaction: if any step fails, nothing is left behind for the client to
+// retry against.
 func (h *Handler) Demo(c *gin.Context) {
+	ctx := c.Request.Context()
+
 	id := uuid.NewString()
 	email := "demo-" + id[:8] + "@fina.vn"
 	name := "Demo"
@@ -176,112 +184,94 @@ func (h *Handler) Demo(c *gin.Context) {
 		fail(c, http.StatusInternalServerError, 50004, "Không thể tạo tài khoản demo")
 		return
 	}
-	if _, err := h.db.Exec(
-		`INSERT INTO users (id, name, email, password_hash) VALUES (?, ?, ?, ?)`,
-		id, name, email, string(hash),
-	); err != nil {
+	u := User{ID: id, Name: name, Email: email}
+
+	err = h.withTx(ctx, func(tx *sql.Tx) error {
+		if err := NewUserRepo(tx).Create(ctx, u, string(hash)); err != nil {
+			return err
+		}
+		catRepo := NewCategoryRepo(tx)
+		if err := catRepo.SeedDefaults(ctx, id); err != nil {
+			return err
+		}
+		return seedSampleData(ctx, catRepo, NewTransactionRepo(tx), NewBudgetRepo(tx), id)
+	})
+	if err != nil {
 		fail(c, http.StatusInternalServerError, 50005, "Không thể tạo tài khoản demo")
 		return
 	}
-	_ = h.seedDefaultCategories(id)
-	_ = h.seedSampleData(id)
-	h.respondWithToken(c, User{ID: id, Name: name, Email: email})
+
+	h.respondWithToken(c, u)
 }
 
-// seedSampleData populates a demo account with realistic transactions + budgets
-// so the dashboard/charts show data immediately. Notes are left empty so rows
-// display the (translatable) category name in either language.
-func (h *Handler) seedSampleData(userID string) error {
-	rows, err := h.db.Query(`SELECT id, name FROM categories WHERE user_id = ?`, userID)
+// sampleTransaction/sampleBudget describe the seed rows a demo account gets;
+// pulled to package scope (rather than local literals) so tests can derive
+// expected counts from len(sampleTransactions)/len(sampleBudgets) instead of
+// hand-copied numbers that would silently drift from the real dataset.
+type sampleTransaction struct {
+	typ    string
+	amount int64
+	cat    string
+	d      int
+}
+
+var sampleTransactions = []sampleTransaction{
+	{"income", 18000000, "Lương", 28},
+	{"income", 2500000, "Thưởng", 20},
+	{"income", 1200000, "Đầu tư", 12},
+	{"expense", 320000, "Ăn uống", 1},
+	{"expense", 150000, "Ăn uống", 2},
+	{"expense", 450000, "Di chuyển", 3},
+	{"expense", 1200000, "Mua sắm", 5},
+	{"expense", 850000, "Hóa đơn", 7},
+	{"expense", 299000, "Giải trí", 8},
+	{"expense", 500000, "Sức khỏe", 10},
+	{"expense", 2200000, "Hóa đơn", 14},
+	{"expense", 640000, "Mua sắm", 16},
+	{"expense", 95000, "Di chuyển", 18},
+}
+
+type sampleBudget struct {
+	cat   string
+	limit int64
+}
+
+var sampleBudgets = []sampleBudget{
+	{"Ăn uống", 3000000},
+	{"Di chuyển", 1000000},
+	{"Mua sắm", 2000000},
+	{"Hóa đơn", 3500000},
+	{"Giải trí", 800000},
+}
+
+// seedSampleData populates a demo account with realistic transactions +
+// budgets so the dashboard/charts show data immediately. Notes are left
+// empty so rows display the (translatable) category name in either language.
+func seedSampleData(ctx context.Context, catRepo *CategoryRepo, txRepo *TransactionRepo, budgetRepo *BudgetRepo, userID string) error {
+	byName, err := catRepo.ByName(ctx, userID)
 	if err != nil {
 		return err
 	}
-	defer rows.Close()
-	byName := map[string]string{}
-	for rows.Next() {
-		var cid, name string
-		if err := rows.Scan(&cid, &name); err == nil {
-			byName[name] = cid
-		}
-	}
 
 	day := func(n int) string { return time.Now().AddDate(0, 0, -n).Format(dateLayout) }
-	type sample struct {
-		typ    string
-		amount int64
-		cat    string
-		d      int
-	}
-	txs := []sample{
-		{"income", 18000000, "Lương", 28},
-		{"income", 2500000, "Thưởng", 20},
-		{"income", 1200000, "Đầu tư", 12},
-		{"expense", 320000, "Ăn uống", 1},
-		{"expense", 150000, "Ăn uống", 2},
-		{"expense", 450000, "Di chuyển", 3},
-		{"expense", 1200000, "Mua sắm", 5},
-		{"expense", 850000, "Hóa đơn", 7},
-		{"expense", 299000, "Giải trí", 8},
-		{"expense", 500000, "Sức khỏe", 10},
-		{"expense", 2200000, "Hóa đơn", 14},
-		{"expense", 640000, "Mua sắm", 16},
-		{"expense", 95000, "Di chuyển", 18},
-	}
-	for _, s := range txs {
+	for _, s := range sampleTransactions {
 		cid := byName[s.cat]
 		if cid == "" {
 			continue
 		}
-		_, _ = h.db.Exec(
-			`INSERT INTO transactions (id, user_id, type, amount, category_id, note, date) VALUES (?, ?, ?, ?, ?, '', ?)`,
-			uuid.NewString(), userID, s.typ, s.amount, cid, day(s.d),
-		)
+		t := Transaction{ID: uuid.NewString(), Type: s.typ, Amount: s.amount, CategoryID: cid, Note: "", Date: day(s.d)}
+		if err := txRepo.Create(ctx, userID, t); err != nil {
+			return err
+		}
 	}
 
 	month := time.Now().Format("2006-01")
-	budgets := []struct {
-		cat   string
-		limit int64
-	}{
-		{"Ăn uống", 3000000},
-		{"Di chuyển", 1000000},
-		{"Mua sắm", 2000000},
-		{"Hóa đơn", 3500000},
-		{"Giải trí", 800000},
-	}
-	for _, b := range budgets {
+	for _, b := range sampleBudgets {
 		cid := byName[b.cat]
 		if cid == "" {
 			continue
 		}
-		_, _ = h.db.Exec(
-			`INSERT INTO budgets (id, user_id, category_id, limit_amount, month) VALUES (?, ?, ?, ?, ?)`,
-			uuid.NewString(), userID, cid, b.limit, month,
-		)
-	}
-	return nil
-}
-
-// seedDefaultCategories gives a new user the same starter categories the UI
-// used to seed locally.
-func (h *Handler) seedDefaultCategories(userID string) error {
-	defaults := []Category{
-		{Name: "Lương", Type: "income", Color: "#10b981", Icon: "Wallet"},
-		{Name: "Thưởng", Type: "income", Color: "#22c55e", Icon: "Gift"},
-		{Name: "Đầu tư", Type: "income", Color: "#0ea5e9", Icon: "TrendingUp"},
-		{Name: "Ăn uống", Type: "expense", Color: "#f97316", Icon: "Utensils"},
-		{Name: "Di chuyển", Type: "expense", Color: "#6366f1", Icon: "Car"},
-		{Name: "Mua sắm", Type: "expense", Color: "#ec4899", Icon: "ShoppingBag"},
-		{Name: "Hóa đơn", Type: "expense", Color: "#eab308", Icon: "Receipt"},
-		{Name: "Sức khỏe", Type: "expense", Color: "#ef4444", Icon: "HeartPulse"},
-		{Name: "Giải trí", Type: "expense", Color: "#8b5cf6", Icon: "Gamepad2"},
-		{Name: "Khác", Type: "expense", Color: "#64748b", Icon: "MoreHorizontal"},
-	}
-	for _, cat := range defaults {
-		if _, err := h.db.Exec(
-			`INSERT INTO categories (id, user_id, name, type, color, icon) VALUES (?, ?, ?, ?, ?, ?)`,
-			uuid.NewString(), userID, cat.Name, cat.Type, cat.Color, cat.Icon,
-		); err != nil {
+		if _, err := budgetRepo.Upsert(ctx, userID, Budget{CategoryID: cid, Limit: b.limit, Month: month}); err != nil {
 			return err
 		}
 	}

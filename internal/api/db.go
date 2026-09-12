@@ -3,30 +3,18 @@ package api
 import (
 	"database/sql"
 	"fmt"
-	"os"
 	"time"
 
 	_ "github.com/go-sql-driver/mysql"
 )
 
-func envOr(key, fallback string) string {
-	if v := os.Getenv(key); v != "" {
-		return v
-	}
-	return fallback
-}
-
-// Connect opens a MySQL pool from BLUEPRINT_DB_* env vars and waits (with
-// retries) until the server is reachable — the DB container may still be
-// starting when the app boots.
-func Connect() (*sql.DB, error) {
+// Connect opens a MySQL pool from cfg and waits (with retries) until the
+// server is reachable — the DB container may still be starting when the app
+// boots. Build cfg with LoadConfig().DB.
+func Connect(cfg DBConfig) (*sql.DB, error) {
 	dsn := fmt.Sprintf(
 		"%s:%s@tcp(%s:%s)/%s?parseTime=true&charset=utf8mb4&loc=Local",
-		os.Getenv("BLUEPRINT_DB_USERNAME"),
-		os.Getenv("BLUEPRINT_DB_PASSWORD"),
-		envOr("BLUEPRINT_DB_HOST", "localhost"),
-		envOr("BLUEPRINT_DB_PORT", "3306"),
-		os.Getenv("BLUEPRINT_DB_DATABASE"),
+		cfg.Username, cfg.Password, cfg.Host, cfg.Port, cfg.Database,
 	)
 
 	db, err := sql.Open("mysql", dsn)

@@ -9,24 +9,10 @@ import (
 )
 
 func (h *Handler) ListCategories(c *gin.Context) {
-	rows, err := h.db.Query(
-		`SELECT id, name, type, color, icon FROM categories WHERE user_id = ? ORDER BY created_at`,
-		userIDFrom(c),
-	)
+	list, err := h.categories.List(c.Request.Context(), userIDFrom(c))
 	if err != nil {
 		fail(c, http.StatusInternalServerError, 50010, "Không thể tải danh mục")
 		return
-	}
-	defer rows.Close()
-
-	list := make([]Category, 0)
-	for rows.Next() {
-		var cat Category
-		if err := rows.Scan(&cat.ID, &cat.Name, &cat.Type, &cat.Color, &cat.Icon); err != nil {
-			fail(c, http.StatusInternalServerError, 50011, "Lỗi đọc danh mục")
-			return
-		}
-		list = append(list, cat)
 	}
 	ok(c, list)
 }
@@ -50,10 +36,7 @@ func (h *Handler) CreateCategory(c *gin.Context) {
 	}
 	in.ID = uuid.NewString()
 
-	if _, err := h.db.Exec(
-		`INSERT INTO categories (id, user_id, name, type, color, icon) VALUES (?, ?, ?, ?, ?, ?)`,
-		in.ID, userIDFrom(c), in.Name, in.Type, in.Color, in.Icon,
-	); err != nil {
+	if err := h.categories.Create(c.Request.Context(), userIDFrom(c), in); err != nil {
 		fail(c, http.StatusInternalServerError, 50012, "Không thể tạo danh mục")
 		return
 	}
@@ -61,10 +44,7 @@ func (h *Handler) CreateCategory(c *gin.Context) {
 }
 
 func (h *Handler) DeleteCategory(c *gin.Context) {
-	if _, err := h.db.Exec(
-		`DELETE FROM categories WHERE id = ? AND user_id = ?`,
-		c.Param("id"), userIDFrom(c),
-	); err != nil {
+	if err := h.categories.Delete(c.Request.Context(), userIDFrom(c), c.Param("id")); err != nil {
 		fail(c, http.StatusInternalServerError, 50013, "Không thể xóa danh mục")
 		return
 	}
