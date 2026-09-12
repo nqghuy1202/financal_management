@@ -109,6 +109,19 @@ func Migrate(db *sql.DB) error {
 			cycle_start_day TINYINT  NOT NULL DEFAULT 1,
 			CONSTRAINT fk_user_settings_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+
+		`CREATE TABLE IF NOT EXISTS budget_alert_state (
+			id               CHAR(36)  NOT NULL PRIMARY KEY,
+			user_id          CHAR(36)  NOT NULL,
+			category_id      CHAR(36)  NOT NULL,
+			cycle_start_date DATE      NOT NULL,
+			threshold        INT       NOT NULL CHECK (threshold IN (70, 90, 100)),
+			triggered_at     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			dismissed_at     TIMESTAMP NULL,
+			UNIQUE KEY uq_alert (user_id, category_id, cycle_start_date, threshold),
+			CONSTRAINT fk_alert_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+			CONSTRAINT fk_alert_category FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE CASCADE
+		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
 	}
 	for _, s := range stmts {
 		if _, err := db.Exec(s); err != nil {

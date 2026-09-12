@@ -194,3 +194,59 @@ func TestTransactionRepo_SumExpensesInRange_QueryError(t *testing.T) {
 	assert.ErrorIs(t, err, sql.ErrConnDone)
 	require.NoError(t, mock.ExpectationsWereMet())
 }
+
+// TestTransactionRepo_SumExpensesInCategoryExcluding_ExcludesOwnRow pins the
+// spec's core requirement: the transaction's own id (already persisted by
+// the time this runs, per checkBudgetThreshold's contract) is excluded from
+// the sum via "AND id != ?", along with category/type/date filtering.
+func TestTransactionRepo_SumExpensesInCategoryExcluding_ExcludesOwnRow(t *testing.T) {
+	repo, mock, closeDB := newMockTransactionRepo(t)
+	defer closeDB()
+
+	from := mustDate("2026-09-01")
+	to := mustDate("2026-10-01")
+	mock.ExpectQuery(`SELECT COALESCE\(SUM\(amount\), 0\) FROM transactions\s+WHERE user_id = \? AND category_id = \? AND type = 'expense' AND date >= \? AND date < \? AND id != \?`).
+		WithArgs("u1", "c1", "2026-09-01", "2026-10-01", "t1").
+		WillReturnRows(sqlmock.NewRows([]string{"sum"}).AddRow(int64(400000)))
+
+	sum, err := repo.SumExpensesInCategoryExcluding(context.Background(), "u1", "c1", from, to, "t1")
+	require.NoError(t, err)
+	assert.Equal(t, int64(400000), sum)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+// TestTransactionRepo_SumExpensesInCategoryExcluding_NoOtherTransactions pins
+// the zero-case: COALESCE keeps the sum 0, not an error, when the excluded
+// row is the only one in the category/cycle.
+func TestTransactionRepo_SumExpensesInCategoryExcluding_NoOtherTransactions(t *testing.T) {
+	repo, mock, closeDB := newMockTransactionRepo(t)
+	defer closeDB()
+
+	from := mustDate("2026-09-01")
+	to := mustDate("2026-10-01")
+	mock.ExpectQuery(`SELECT COALESCE\(SUM\(amount\), 0\) FROM transactions\s+WHERE user_id = \? AND category_id = \? AND type = 'expense' AND date >= \? AND date < \? AND id != \?`).
+		WithArgs("u1", "c1", "2026-09-01", "2026-10-01", "t1").
+		WillReturnRows(sqlmock.NewRows([]string{"sum"}).AddRow(int64(0)))
+
+	sum, err := repo.SumExpensesInCategoryExcluding(context.Background(), "u1", "c1", from, to, "t1")
+	require.NoError(t, err)
+	assert.Equal(t, int64(0), sum)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+// TestTransactionRepo_SumExpensesInCategoryExcluding_QueryError pins that a
+// genuine query error propagates instead of being swallowed into 0.
+func TestTransactionRepo_SumExpensesInCategoryExcluding_QueryError(t *testing.T) {
+	repo, mock, closeDB := newMockTransactionRepo(t)
+	defer closeDB()
+
+	from := mustDate("2026-09-01")
+	to := mustDate("2026-10-01")
+	mock.ExpectQuery(`SELECT COALESCE\(SUM\(amount\), 0\) FROM transactions\s+WHERE user_id = \? AND category_id = \? AND type = 'expense' AND date >= \? AND date < \? AND id != \?`).
+		WithArgs("u1", "c1", "2026-09-01", "2026-10-01", "t1").
+		WillReturnError(sql.ErrConnDone)
+
+	_, err := repo.SumExpensesInCategoryExcluding(context.Background(), "u1", "c1", from, to, "t1")
+	assert.ErrorIs(t, err, sql.ErrConnDone)
+	require.NoError(t, mock.ExpectationsWereMet())
+}

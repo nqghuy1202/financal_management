@@ -78,3 +78,20 @@ func (r *TransactionRepo) SumExpensesInRange(ctx context.Context, userID string,
 	).Scan(&sum)
 	return sum, err
 }
+
+// SumExpensesInCategoryExcluding returns the total amount of expense-type
+// transactions for (userID, categoryID) with date in [from, to), excluding
+// the row identified by excludeID. Used by the budget-threshold check to
+// compute "spend before this save": since the transaction being checked is
+// already written to the DB (Create/Update both run before the check, inside
+// the same tx) by the time this runs, its own id must always be passed as
+// excludeID on both paths, or its amount would be double-counted.
+func (r *TransactionRepo) SumExpensesInCategoryExcluding(ctx context.Context, userID, categoryID string, from, to time.Time, excludeID string) (int64, error) {
+	var sum int64
+	err := r.db.QueryRowContext(ctx,
+		`SELECT COALESCE(SUM(amount), 0) FROM transactions
+		 WHERE user_id = ? AND category_id = ? AND type = 'expense' AND date >= ? AND date < ? AND id != ?`,
+		userID, categoryID, from.Format(dateLayout), to.Format(dateLayout), excludeID,
+	).Scan(&sum)
+	return sum, err
+}

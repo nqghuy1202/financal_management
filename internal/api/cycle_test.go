@@ -181,3 +181,68 @@ func TestPreviousCycles(t *testing.T) {
 	assert.True(t, cycles[2].Start.Equal(mustDate("2026-06-01")))
 	assert.True(t, cycles[2].End.Equal(mustDate("2026-07-01")))
 }
+
+// TestCrossedThreshold_FirstCrossing pins the I/O matrix's "First crossing"
+// scenario: spend moves from below 70% to above it.
+func TestCrossedThreshold_FirstCrossing(t *testing.T) {
+	threshold, crossed := CrossedThreshold(600_000, 750_000, 1_000_000)
+	assert.True(t, crossed)
+	assert.Equal(t, 70, threshold)
+}
+
+// TestCrossedThreshold_AlreadyOverThreshold_NoNewCrossing pins the "Already
+// alerted at this threshold" scenario at the pure-function level: spend stays
+// above 90% but below 100%, so no new crossing is reported for either
+// threshold it's already past.
+func TestCrossedThreshold_AlreadyOverThreshold_NoNewCrossing(t *testing.T) {
+	threshold, crossed := CrossedThreshold(950_000, 980_000, 1_000_000)
+	assert.False(t, crossed)
+	assert.Equal(t, 0, threshold)
+}
+
+// TestCrossedThreshold_MultiThresholdJump pins the "Multi-threshold jump"
+// scenario: one jump from 40% to 105% must report only the highest threshold
+// (100), never 70 or 90.
+func TestCrossedThreshold_MultiThresholdJump(t *testing.T) {
+	threshold, crossed := CrossedThreshold(400_000, 1_050_000, 1_000_000)
+	assert.True(t, crossed)
+	assert.Equal(t, 100, threshold)
+}
+
+// TestCrossedThreshold_NoBudget_LimitZeroOrNegative pins the "no budget"
+// guard: a non-positive limit never reports a crossing, however large spend
+// is, avoiding a division by zero.
+func TestCrossedThreshold_NoBudget_LimitZeroOrNegative(t *testing.T) {
+	threshold, crossed := CrossedThreshold(0, 1_000_000, 0)
+	assert.False(t, crossed)
+	assert.Equal(t, 0, threshold)
+
+	threshold, crossed = CrossedThreshold(0, 1_000_000, -1)
+	assert.False(t, crossed)
+	assert.Equal(t, 0, threshold)
+}
+
+// TestCrossedThreshold_ExactlyAtThreshold pins the boundary: landing exactly
+// on a threshold (not just past it) counts as crossing it.
+func TestCrossedThreshold_ExactlyAtThreshold(t *testing.T) {
+	threshold, crossed := CrossedThreshold(690_000, 700_000, 1_000_000)
+	assert.True(t, crossed)
+	assert.Equal(t, 70, threshold)
+}
+
+// TestCrossedThreshold_DecreasingSpend_NeverCrosses pins the monotonic
+// property checkBudgetThreshold's callers rely on: spend moving down can
+// never report a crossing, only moving up can.
+func TestCrossedThreshold_DecreasingSpend_NeverCrosses(t *testing.T) {
+	threshold, crossed := CrossedThreshold(900_000, 500_000, 1_000_000)
+	assert.False(t, crossed)
+	assert.Equal(t, 0, threshold)
+}
+
+// TestCrossedThreshold_StaysBelowAllThresholds pins the plain no-crossing
+// case: spend increases but stays under 70%.
+func TestCrossedThreshold_StaysBelowAllThresholds(t *testing.T) {
+	threshold, crossed := CrossedThreshold(100_000, 500_000, 1_000_000)
+	assert.False(t, crossed)
+	assert.Equal(t, 0, threshold)
+}

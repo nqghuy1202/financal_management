@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"database/sql"
 	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
@@ -87,6 +88,39 @@ func TestBudgetRepo_Upsert_UpdateInPlace(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "b1", secondOut.ID, "id must stay the same row, not a newly inserted one")
 	assert.Equal(t, int64(2500000), secondOut.Limit, "list should reflect the latest amount")
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+// TestBudgetRepo_GetByCategoryMonth_Found pins the ordinary path: a budget
+// row exists for the given category/month.
+func TestBudgetRepo_GetByCategoryMonth_Found(t *testing.T) {
+	repo, mock, closeDB := newMockBudgetRepo(t)
+	defer closeDB()
+
+	mock.ExpectQuery(`SELECT id, category_id, limit_amount, month FROM budgets WHERE user_id = \? AND category_id = \? AND month = \?`).
+		WithArgs("u1", "c1", "2026-09").
+		WillReturnRows(sqlmock.NewRows([]string{"id", "category_id", "limit_amount", "month"}).
+			AddRow("b1", "c1", int64(1000000), "2026-09"))
+
+	out, err := repo.GetByCategoryMonth(context.Background(), "u1", "c1", "2026-09")
+	require.NoError(t, err)
+	assert.Equal(t, Budget{ID: "b1", CategoryID: "c1", Limit: 1000000, Month: "2026-09"}, out)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+// TestBudgetRepo_GetByCategoryMonth_NotFound pins the I/O matrix's "No
+// budget set" scenario: sql.ErrNoRows propagates as-is (not wrapped, not
+// swallowed) so callers can distinguish it via ignoreNoRows/errors.Is.
+func TestBudgetRepo_GetByCategoryMonth_NotFound(t *testing.T) {
+	repo, mock, closeDB := newMockBudgetRepo(t)
+	defer closeDB()
+
+	mock.ExpectQuery(`SELECT id, category_id, limit_amount, month FROM budgets WHERE user_id = \? AND category_id = \? AND month = \?`).
+		WithArgs("u1", "c1", "2026-09").
+		WillReturnError(sql.ErrNoRows)
+
+	_, err := repo.GetByCategoryMonth(context.Background(), "u1", "c1", "2026-09")
+	assert.ErrorIs(t, err, sql.ErrNoRows)
 	require.NoError(t, mock.ExpectationsWereMet())
 }
 

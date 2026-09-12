@@ -112,6 +112,26 @@ func DaysRemaining(end, asOf time.Time) int {
 	return days
 }
 
+// CrossedThreshold reports the single highest budget-usage threshold (100,
+// 90, or 70, checked in that order) that newSpent newly crosses relative to
+// prevSpent, given limit. Pure, no I/O.
+//
+// A non-positive limit means "no budget to check against" and never crosses.
+// Checking highest-first means a single save that jumps usage across several
+// thresholds at once (e.g. 40% -> 105%) reports only the highest one newly
+// crossed, never all of them.
+func CrossedThreshold(prevSpent, newSpent, limit int64) (threshold int, crossed bool) {
+	if limit <= 0 {
+		return 0, false
+	}
+	for _, t := range []int{100, 90, 70} {
+		if prevSpent*100/limit < int64(t) && newSpent*100/limit >= int64(t) {
+			return t, true
+		}
+	}
+	return 0, false
+}
+
 // CycleInfo is one cycle's [Start, End) window.
 type CycleInfo struct {
 	Start time.Time

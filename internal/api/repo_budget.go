@@ -59,6 +59,19 @@ func (r *BudgetRepo) Upsert(ctx context.Context, userID string, b Budget) (Budge
 	return out, nil
 }
 
+// GetByCategoryMonth returns the budget row for (userID, categoryID, month),
+// or propagates sql.ErrNoRows as-is when no budget has been set for that
+// category/month — callers use ignoreNoRows (repo_helpers.go) to turn that
+// into a plain "no budget" zero value.
+func (r *BudgetRepo) GetByCategoryMonth(ctx context.Context, userID, categoryID, month string) (Budget, error) {
+	var b Budget
+	err := r.db.QueryRowContext(ctx,
+		`SELECT id, category_id, limit_amount, month FROM budgets WHERE user_id = ? AND category_id = ? AND month = ?`,
+		userID, categoryID, month,
+	).Scan(&b.ID, &b.CategoryID, &b.Limit, &b.Month)
+	return b, err
+}
+
 func (r *BudgetRepo) Delete(ctx context.Context, userID, id string) error {
 	_, err := r.db.ExecContext(ctx, `DELETE FROM budgets WHERE id = ? AND user_id = ?`, id, userID)
 	return err
