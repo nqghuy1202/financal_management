@@ -31,9 +31,7 @@ type Handler struct {
 	categories   *CategoryRepo
 	transactions *TransactionRepo
 	budgets      *BudgetRepo
-	incomes      *IncomeRepo
 	fixedCosts   *FixedCostRepo
-	settings     *SettingsRepo
 }
 
 func NewHandler(db *sql.DB, secret []byte) *Handler {
@@ -44,9 +42,7 @@ func NewHandler(db *sql.DB, secret []byte) *Handler {
 		categories:   NewCategoryRepo(db),
 		transactions: NewTransactionRepo(db),
 		budgets:      NewBudgetRepo(db),
-		incomes:      NewIncomeRepo(db),
 		fixedCosts:   NewFixedCostRepo(db),
-		settings:     NewSettingsRepo(db),
 	}
 }
 
@@ -119,12 +115,18 @@ type FixedCost struct {
 	Amount int64  `json:"amount"`
 }
 
-// Settings holds a user's 1:1 account settings. cycle_start_day exists with
-// its default (1) but stays unused/unedited until Story 1.4 wires
-// PUT /cycle-settings — this story only reads/writes savings_goal.
+// Settings holds a user's 1:1 account settings.
 type Settings struct {
 	SavingsGoal   int64 `json:"savingsGoal"`
 	CycleStartDay int   `json:"cycleStartDay"`
+}
+
+// CycleSettingsResult is the combined response of PUT /cycle-settings: the
+// canonical income row for the (newly computed) current cycle, plus the
+// canonical settings row — both written together in the same save.
+type CycleSettingsResult struct {
+	Income   Income   `json:"income"`
+	Settings Settings `json:"settings"`
 }
 
 // ---- response helpers ----

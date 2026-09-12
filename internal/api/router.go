@@ -33,13 +33,11 @@ func (h *Handler) Register(rg *gin.RouterGroup) {
 		auth.POST("/budgets", h.UpsertBudget)
 		auth.DELETE("/budgets/:id", h.DeleteBudget)
 
-		auth.POST("/incomes", h.UpsertIncome)
-
 		auth.GET("/fixed-costs", h.ListFixedCosts)
 		auth.POST("/fixed-costs", h.CreateFixedCost)
 		auth.PUT("/fixed-costs/:id", h.UpdateFixedCost)
 		auth.DELETE("/fixed-costs/:id", h.DeleteFixedCost)
 
-		auth.PUT("/settings/savings-goal", h.UpdateSavingsGoal)
+		auth.PUT("/cycle-settings", h.UpdateCycleSettings)
 	}
 }
