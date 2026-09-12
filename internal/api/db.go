@@ -82,6 +82,16 @@ func Migrate(db *sql.DB) error {
 			CONSTRAINT fk_budget_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
 			CONSTRAINT fk_budget_category FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE CASCADE
 		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+
+		`CREATE TABLE IF NOT EXISTS incomes (
+			id               CHAR(36) NOT NULL PRIMARY KEY,
+			user_id          CHAR(36) NOT NULL,
+			cycle_start_date DATE     NOT NULL,
+			amount           BIGINT   NOT NULL,
+			created_at       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			UNIQUE KEY uq_income (user_id, cycle_start_date),
+			CONSTRAINT fk_income_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
 	}
 	for _, s := range stmts {
 		if _, err := db.Exec(s); err != nil {

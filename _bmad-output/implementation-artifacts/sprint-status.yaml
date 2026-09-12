@@ -37,7 +37,7 @@ story_location: _bmad-output/implementation-artifacts
 development_status:
   epic-1: in-progress
   1-1-hoàn-thiện-xác-thực-refactor-repository-layer-hiện-có: review
-  1-2-khai-báo-lương-cho-chu-kỳ-hiện-tại: backlog
+  1-2-khai-báo-lương-cho-chu-kỳ-hiện-tại: review
   1-3-quản-lý-chi-phí-cố-định-và-mục-tiêu-tiết-kiệm: backlog
   1-4-cấu-hình-ngày-bắt-đầu-chu-kỳ-ngân-sách: backlog
   1-5-hiển-thị-safe-to-spend-trên-dashboard: backlog

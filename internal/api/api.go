@@ -31,6 +31,7 @@ type Handler struct {
 	categories   *CategoryRepo
 	transactions *TransactionRepo
 	budgets      *BudgetRepo
+	incomes      *IncomeRepo
 }
 
 func NewHandler(db *sql.DB, secret []byte) *Handler {
@@ -41,6 +42,7 @@ func NewHandler(db *sql.DB, secret []byte) *Handler {
 		categories:   NewCategoryRepo(db),
 		transactions: NewTransactionRepo(db),
 		budgets:      NewBudgetRepo(db),
+		incomes:      NewIncomeRepo(db),
 	}
 }
 
@@ -96,6 +98,13 @@ type Budget struct {
 	CategoryID string `json:"categoryId"`
 	Limit      int64  `json:"limit"`
 	Month      string `json:"month"` // yyyy-mm
+}
+
+// Income is a user's declared income for one budget cycle.
+type Income struct {
+	ID             string `json:"id"`
+	CycleStartDate string `json:"cycleStartDate"` // yyyy-mm-dd
+	Amount         int64  `json:"amount"`
 }
 
 // ---- response helpers ----

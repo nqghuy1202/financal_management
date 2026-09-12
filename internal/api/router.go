@@ -32,5 +32,7 @@ func (h *Handler) Register(rg *gin.RouterGroup) {
 		auth.GET("/budgets", h.ListBudgets)
 		auth.POST("/budgets", h.UpsertBudget)
 		auth.DELETE("/budgets/:id", h.DeleteBudget)
+
+		auth.POST("/incomes", h.UpsertIncome)
 	}
 }
