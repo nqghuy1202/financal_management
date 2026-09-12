@@ -121,4 +121,12 @@
   .chip {
     @apply inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium;
   }
+
+  /* Hero display figure for Safe-to-spend (DESIGN.md's "display-number" type role) */
+  .display-number {
+    font-size: 40px;
+    font-weight: 800;
+    line-height: 1.1;
+    letter-spacing: -0.01em;
+  }
 }

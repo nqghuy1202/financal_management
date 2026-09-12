@@ -23,6 +23,7 @@ import { useData } from '../context/DataContext'
 import { useI18n } from '../context/I18nContext'
 import { StatCard } from '../components/StatCard'
 import { CategoryIcon } from '../components/CategoryIcon'
+import { SafeToSpendHero } from '../components/SafeToSpendHero'
 import { budgetProgress, expenseBreakdown, filterByMonth, monthlyTrend, sumByType } from '../lib/analytics'
 import { currentMonth, formatCompact, formatCurrency, formatDate } from '../lib/format'
 
@@ -47,6 +48,8 @@ export function Dashboard() {
 
   return (
     <div className="space-y-6">
+      <SafeToSpendHero />
+
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-ink-900">{tr('dash.title')}</h1>

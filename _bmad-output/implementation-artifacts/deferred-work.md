@@ -25,3 +25,15 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-1-5-safe-to-spend-dashboard.md`
   summary: Story 1.5's frontend half — the `safe-to-spend-hero`, `CycleUpdateSheet` (income/fixed-costs/savings-goal/cycle-day editing via the existing `Modal`), and `DataContext` wiring (cycleSummary/fixedCosts state, saveCycleSettings/fixed-cost mutations, cross-refetch after transaction/settings changes) — split off from the backend `GET /cycle/summary` work to keep each spec under the token budget.
   evidence: User-approved split at the token-count gate; the backend half ships first as its own reviewable/testable unit (consistent with Stories 1.2-1.4's backend-first pattern), and this frontend half is meant to be picked up immediately after in the same session, not deferred indefinitely.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-1-5-safe-to-spend-frontend.md`
+  summary: **Priority follow-up, not a someday item.** `CycleUpdateSheet` pre-fills savings-goal/cycle-start-day from a client-only `DEFAULT_SETTINGS = {0, 1}` state that's never fetched from the server (no `GET /settings` exists — only `PUT /cycle-settings`, which is write-only). A returning user with real, previously-saved non-default values who opens the sheet in a new session and clicks Save without touching those two fields will have them silently overwritten back to `{0, 1}`.
+  evidence: Self-identified by the implementer and independently confirmed by review with a concrete demonstration. Root cause: no backend endpoint exists to read the current `user_settings` row without writing. Fixing it needs a small backend addition (e.g. `GET /settings`, or folding `savingsGoal`/`cycleStartDay` into `GET /cycle/summary`'s existing response) — explicitly out of scope for the frontend-only spec that surfaced it. Should be picked up before this app sees real multi-session usage, since it can silently destroy real user data.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-1-5-safe-to-spend-frontend.md`
+  summary: The hero's "may be inaccurate" hint for fixed-costs/savings-goal can't distinguish "never set" (shows the same `0` default) from "intentionally set to 0" — same root cause as the settings-defaults gap above (no read endpoint to know whether a `user_settings` row exists at all).
+  evidence: Would be resolved by the same backend read-endpoint fix as the entry above; no separate work needed once that lands.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-1-5-safe-to-spend-frontend.md`
+  summary: A background `refreshCycleSummary()` call in `DataContext` can have its response land after logout (or a fast account switch) with no cancellation guard, momentarily writing stale or another session's cycle data into state.
+  evidence: Real but low-probability (requires a logout exactly while a refresh is in flight); a proper fix needs a request-token or mounted-ref pattern akin to the `cancelled` flag the initial mount effect already uses, more than a direct correction — worth doing if this pattern is revisited for other reasons.

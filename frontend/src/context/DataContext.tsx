@@ -1,15 +1,41 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
-import type { Budget, Category, Transaction } from '../types'
+import type {
+  Budget,
+  Category,
+  CycleSettingsInput,
+  CycleSummary,
+  FixedCost,
+  Income,
+  Settings,
+  Transaction,
+} from '../types'
 import { apiGet, apiSend } from '../lib/api'
 import { localizedCategory } from '../lib/i18n'
 import { useAuth } from './AuthContext'
 import { useI18n } from './I18nContext'
 
+// Response shape of PUT /cycle-settings: the canonical income row for the
+// (newly computed) current cycle, plus the canonical settings row.
+interface CycleSettingsResult {
+  income: Income
+  settings: Settings
+}
+
+// The backend has no GET for a user's settings row (only PUT /cycle-settings,
+// which returns it back) so this mirrors the DB column defaults
+// (savings_goal 0, cycle_start_day 1) until the first successful save this
+// session populates the real value.
+const DEFAULT_SETTINGS: Settings = { savingsGoal: 0, cycleStartDay: 1 }
+
 interface DataContextValue {
   categories: Category[]
   transactions: Transaction[]
   budgets: Budget[]
+  cycleSummary: CycleSummary | null
+  fixedCosts: FixedCost[]
+  settings: Settings
   loading: boolean
+  loadError: boolean
   categoryById: (id: string) => Category | undefined
 
   addTransaction: (t: Omit<Transaction, 'id'>) => Promise<void>
@@ -21,6 +47,12 @@ interface DataContextValue {
 
   upsertBudget: (b: Omit<Budget, 'id'> & { id?: string }) => Promise<void>
   deleteBudget: (id: string) => Promise<void>
+
+  refreshCycleSummary: () => Promise<void>
+  saveCycleSettings: (input: CycleSettingsInput) => Promise<void>
+  addFixedCost: (fc: Omit<FixedCost, 'id'>) => Promise<void>
+  updateFixedCost: (fc: FixedCost) => Promise<void>
+  deleteFixedCost: (id: string) => Promise<void>
 }
 
 const DataContext = createContext<DataContextValue | null>(null)
@@ -31,7 +63,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [rawCategories, setRawCategories] = useState<Category[]>([])
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [budgets, setBudgets] = useState<Budget[]>([])
+  const [cycleSummary, setCycleSummary] = useState<CycleSummary | null>(null)
+  const [fixedCosts, setFixedCosts] = useState<FixedCost[]>([])
+  const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS)
   const [loading, setLoading] = useState(false)
+  const [loadError, setLoadError] = useState(false)
 
   // Localize default category names to the current language; user-created
   // names pass through unchanged. Category logic elsewhere keys off id, not name.
@@ -46,26 +82,38 @@ export function DataProvider({ children }: { children: ReactNode }) {
       setRawCategories([])
       setTransactions([])
       setBudgets([])
+      setCycleSummary(null)
+      setFixedCosts([])
+      setSettings(DEFAULT_SETTINGS)
       return
     }
     let cancelled = false
     setLoading(true)
+    setLoadError(false)
     Promise.all([
       apiGet<Category[]>('/categories'),
       apiGet<Transaction[]>('/transactions'),
       apiGet<Budget[]>('/budgets'),
+      apiGet<CycleSummary>('/cycle/summary'),
+      apiGet<FixedCost[]>('/fixed-costs'),
     ])
-      .then(([cats, txs, buds]) => {
+      .then(([cats, txs, buds, summary, fcs]) => {
         if (cancelled) return
         setRawCategories(cats)
         setTransactions(txs)
         setBudgets(buds)
+        setCycleSummary(summary)
+        setFixedCosts(fcs)
       })
       .catch(() => {
         if (!cancelled) {
           setRawCategories([])
           setTransactions([])
           setBudgets([])
+          setCycleSummary(null)
+          setFixedCosts([])
+          setSettings(DEFAULT_SETTINGS)
+          setLoadError(true)
         }
       })
       .finally(() => !cancelled && setLoading(false))
@@ -79,20 +127,44 @@ export function DataProvider({ children }: { children: ReactNode }) {
     [categories],
   )
 
-  const addTransaction = useCallback(async (t: Omit<Transaction, 'id'>) => {
-    const created = await apiSend<Transaction>('POST', '/transactions', t)
-    setTransactions((prev) => [created, ...prev])
+  // Best-effort refetch — used after any mutation that can change
+  // Safe-to-spend. Keeps the previous summary on failure rather than
+  // clearing the hero out from under the user.
+  const refreshCycleSummary = useCallback(async () => {
+    try {
+      const summary = await apiGet<CycleSummary>('/cycle/summary')
+      setCycleSummary(summary)
+    } catch {
+      // ignore — next successful load will reconcile
+    }
   }, [])
 
-  const updateTransaction = useCallback(async (t: Transaction) => {
-    const updated = await apiSend<Transaction>('PUT', `/transactions/${t.id}`, t)
-    setTransactions((prev) => prev.map((x) => (x.id === updated.id ? updated : x)))
-  }, [])
+  const addTransaction = useCallback(
+    async (t: Omit<Transaction, 'id'>) => {
+      const created = await apiSend<Transaction>('POST', '/transactions', t)
+      setTransactions((prev) => [created, ...prev])
+      refreshCycleSummary()
+    },
+    [refreshCycleSummary],
+  )
 
-  const deleteTransaction = useCallback(async (id: string) => {
-    await apiSend('DELETE', `/transactions/${id}`)
-    setTransactions((prev) => prev.filter((x) => x.id !== id))
-  }, [])
+  const updateTransaction = useCallback(
+    async (t: Transaction) => {
+      const updated = await apiSend<Transaction>('PUT', `/transactions/${t.id}`, t)
+      setTransactions((prev) => prev.map((x) => (x.id === updated.id ? updated : x)))
+      refreshCycleSummary()
+    },
+    [refreshCycleSummary],
+  )
+
+  const deleteTransaction = useCallback(
+    async (id: string) => {
+      await apiSend('DELETE', `/transactions/${id}`)
+      setTransactions((prev) => prev.filter((x) => x.id !== id))
+      refreshCycleSummary()
+    },
+    [refreshCycleSummary],
+  )
 
   const addCategory = useCallback(async (c: Omit<Category, 'id'>) => {
     const created = await apiSend<Category>('POST', '/categories', c)
@@ -126,12 +198,55 @@ export function DataProvider({ children }: { children: ReactNode }) {
     setBudgets((prev) => prev.filter((b) => b.id !== id))
   }, [])
 
+  const saveCycleSettings = useCallback(
+    async (input: CycleSettingsInput) => {
+      const result = await apiSend<CycleSettingsResult>('PUT', '/cycle-settings', input)
+      setSettings(result.settings)
+      refreshCycleSummary()
+    },
+    [refreshCycleSummary],
+  )
+
+  const addFixedCost = useCallback(
+    async (fc: Omit<FixedCost, 'id'>) => {
+      const created = await apiSend<FixedCost>('POST', '/fixed-costs', fc)
+      setFixedCosts((prev) => [...prev, created])
+      refreshCycleSummary()
+    },
+    [refreshCycleSummary],
+  )
+
+  const updateFixedCost = useCallback(
+    async (fc: FixedCost) => {
+      const updated = await apiSend<FixedCost>('PUT', `/fixed-costs/${fc.id}`, {
+        name: fc.name,
+        amount: fc.amount,
+      })
+      setFixedCosts((prev) => prev.map((x) => (x.id === updated.id ? updated : x)))
+      refreshCycleSummary()
+    },
+    [refreshCycleSummary],
+  )
+
+  const deleteFixedCost = useCallback(
+    async (id: string) => {
+      await apiSend('DELETE', `/fixed-costs/${id}`)
+      setFixedCosts((prev) => prev.filter((x) => x.id !== id))
+      refreshCycleSummary()
+    },
+    [refreshCycleSummary],
+  )
+
   const value = useMemo<DataContextValue>(
     () => ({
       categories,
       transactions,
       budgets,
+      cycleSummary,
+      fixedCosts,
+      settings,
       loading,
+      loadError,
       categoryById,
       addTransaction,
       updateTransaction,
@@ -140,12 +255,21 @@ export function DataProvider({ children }: { children: ReactNode }) {
       deleteCategory,
       upsertBudget,
       deleteBudget,
+      refreshCycleSummary,
+      saveCycleSettings,
+      addFixedCost,
+      updateFixedCost,
+      deleteFixedCost,
     }),
     [
       categories,
       transactions,
       budgets,
+      cycleSummary,
+      fixedCosts,
+      settings,
       loading,
+      loadError,
       categoryById,
       addTransaction,
       updateTransaction,
@@ -154,6 +278,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
       deleteCategory,
       upsertBudget,
       deleteBudget,
+      refreshCycleSummary,
+      saveCycleSettings,
+      addFixedCost,
+      updateFixedCost,
+      deleteFixedCost,
     ],
   )
 
