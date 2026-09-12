@@ -34,6 +34,54 @@ func TestSettingsRepo_Upsert_Insert(t *testing.T) {
 	require.NoError(t, mock.ExpectationsWereMet())
 }
 
+// TestSettingsRepo_Get_Found pins the ordinary path: an existing row is
+// returned as-is.
+func TestSettingsRepo_Get_Found(t *testing.T) {
+	repo, mock, closeDB := newMockSettingsRepo(t)
+	defer closeDB()
+
+	mock.ExpectQuery(`SELECT savings_goal, cycle_start_day FROM user_settings WHERE user_id = \?`).
+		WithArgs("u1").
+		WillReturnRows(sqlmock.NewRows([]string{"savings_goal", "cycle_start_day"}).AddRow(int64(3500000), 15))
+
+	out, err := repo.Get(context.Background(), "u1")
+	require.NoError(t, err)
+	assert.Equal(t, Settings{SavingsGoal: 3500000, CycleStartDay: 15}, out)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+// TestSettingsRepo_Get_DefaultsOnNoRow pins the spec's requirement: no row
+// yet must return the DB-column defaults (savings_goal 0, cycle_start_day
+// 1) with a nil error, never sql.ErrNoRows.
+func TestSettingsRepo_Get_DefaultsOnNoRow(t *testing.T) {
+	repo, mock, closeDB := newMockSettingsRepo(t)
+	defer closeDB()
+
+	mock.ExpectQuery(`SELECT savings_goal, cycle_start_day FROM user_settings WHERE user_id = \?`).
+		WithArgs("u1").
+		WillReturnError(sql.ErrNoRows)
+
+	out, err := repo.Get(context.Background(), "u1")
+	require.NoError(t, err)
+	assert.Equal(t, Settings{SavingsGoal: 0, CycleStartDay: 1}, out)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+// TestSettingsRepo_Get_OtherErrorPropagates pins that a genuine DB error
+// (not "no rows") is not swallowed into the default.
+func TestSettingsRepo_Get_OtherErrorPropagates(t *testing.T) {
+	repo, mock, closeDB := newMockSettingsRepo(t)
+	defer closeDB()
+
+	mock.ExpectQuery(`SELECT savings_goal, cycle_start_day FROM user_settings WHERE user_id = \?`).
+		WithArgs("u1").
+		WillReturnError(sql.ErrConnDone)
+
+	_, err := repo.Get(context.Background(), "u1")
+	assert.ErrorIs(t, err, sql.ErrConnDone)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
 // TestSettingsRepo_Upsert_UpdateInPlace pins the acceptance criterion:
 // re-saving settings on an existing row updates both savings_goal and
 // cycle_start_day in place, not as a second row.

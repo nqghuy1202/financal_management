@@ -39,5 +39,6 @@ func (h *Handler) Register(rg *gin.RouterGroup) {
 		auth.DELETE("/fixed-costs/:id", h.DeleteFixedCost)
 
 		auth.PUT("/cycle-settings", h.UpdateCycleSettings)
+		auth.GET("/cycle/summary", h.GetCycleSummary)
 	}
 }

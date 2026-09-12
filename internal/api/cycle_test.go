@@ -87,6 +87,90 @@ func TestPreviousCycles_ClampShortMonthBoundary(t *testing.T) {
 	assert.True(t, cycles[2].End.Equal(mustDate("2025-12-31")), "cycle 2 should end Dec 31")
 }
 
+// TestSafeToSpend_EnvelopeFormula pins the core formula: income minus fixed
+// costs, savings goal and what's already spent this cycle, split evenly over
+// the days remaining.
+func TestSafeToSpend_EnvelopeFormula(t *testing.T) {
+	got := SafeToSpend(15_000_000, 5_000_000, 2_000_000, 1_000_000, 10)
+	assert.Equal(t, int64(700_000), got)
+}
+
+// TestSafeToSpend_MissingInputsDefaultToZero pins the I/O matrix's "fixed
+// costs / savings goal not set" scenario at the pure-function level: callers
+// pass 0 for whichever inputs are undeclared and the formula treats them as
+// such, without special-casing.
+func TestSafeToSpend_MissingInputsDefaultToZero(t *testing.T) {
+	got := SafeToSpend(10_000_000, 0, 0, 0, 10)
+	assert.Equal(t, int64(1_000_000), got)
+}
+
+// TestSafeToSpend_Overspent_NeverClampedToZero pins AD-8: when
+// spentThisCycleSoFar pushes the envelope negative, SafeToSpend returns the
+// real negative number, never clamped to 0.
+func TestSafeToSpend_Overspent_NeverClampedToZero(t *testing.T) {
+	got := SafeToSpend(5_000_000, 3_000_000, 1_000_000, 4_000_000, 5)
+	assert.Equal(t, int64(-600_000), got)
+	assert.Negative(t, got)
+}
+
+// TestSafeToSpend_Overspent_FloorsTowardNegativeInfinity pins the floor-div
+// fix: a numerator that's negative but smaller in magnitude than
+// daysRemaining must still floor to -1, not truncate to 0 the way Go's
+// built-in / would (-1/2 == 0 under truncation).
+func TestSafeToSpend_Overspent_FloorsTowardNegativeInfinity(t *testing.T) {
+	got := SafeToSpend(0, 0, 0, 1, 2)
+	assert.Equal(t, int64(-1), got)
+}
+
+// TestSafeToSpend_ZeroDaysRemaining_NoPanic pins the guard: daysRemaining=0
+// must not divide by zero, and instead behaves as if it were 1 (matching
+// DaysRemaining's own floor-at-1 convention).
+func TestSafeToSpend_ZeroDaysRemaining_NoPanic(t *testing.T) {
+	assert.NotPanics(t, func() {
+		got := SafeToSpend(10_000_000, 0, 0, 0, 0)
+		assert.Equal(t, int64(10_000_000), got)
+	})
+}
+
+// TestDaysRemaining_MidCycle pins the ordinary case: several days left,
+// truncated to whole days regardless of time-of-day.
+func TestDaysRemaining_MidCycle(t *testing.T) {
+	asOf := mustDate("2026-09-15")
+	end := mustDate("2026-10-01")
+	assert.Equal(t, 16, DaysRemaining(end, asOf))
+}
+
+// TestDaysRemaining_LastDayOfCycle pins the I/O matrix's boundary scenario:
+// asOf is the final calendar day before end, so exactly 1 day remains, never
+// 0 (avoids div-by-zero downstream in SafeToSpend).
+func TestDaysRemaining_LastDayOfCycle(t *testing.T) {
+	asOf := mustDate("2026-09-30")
+	end := mustDate("2026-10-01")
+	assert.Equal(t, 1, DaysRemaining(end, asOf))
+}
+
+// TestDaysRemaining_TimeOfDayIgnored pins the midnight-truncation rule: an
+// asOf later in the day than end's own time-of-day must not reduce the count
+// below the whole-day difference.
+func TestDaysRemaining_TimeOfDayIgnored(t *testing.T) {
+	asOf := time.Date(2026, 9, 30, 23, 59, 59, 0, time.UTC)
+	end := time.Date(2026, 10, 1, 0, 0, 0, 0, time.UTC)
+	assert.Equal(t, 1, DaysRemaining(end, asOf))
+}
+
+// TestDaysRemaining_FlooredAtOne pins the floor itself: even an asOf that
+// lands on or after end (which CycleWindow should never produce, but the
+// pure function must still defend against) never returns less than 1.
+func TestDaysRemaining_FlooredAtOne(t *testing.T) {
+	asOf := mustDate("2026-10-01")
+	end := mustDate("2026-10-01")
+	assert.Equal(t, 1, DaysRemaining(end, asOf))
+
+	asOf = mustDate("2026-10-02")
+	end = mustDate("2026-10-01")
+	assert.Equal(t, 1, DaysRemaining(end, asOf))
+}
+
 func TestPreviousCycles(t *testing.T) {
 	cycles := PreviousCycles(1, mustDate("2026-09-15"), 3)
 	assert.Len(t, cycles, 3)

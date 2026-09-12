@@ -1,6 +1,9 @@
 package api
 
-import "context"
+import (
+	"context"
+	"database/sql"
+)
 
 // SettingsRepo is the data-access layer for the user's 1:1 settings row.
 type SettingsRepo struct{ db dbtx }
@@ -29,6 +32,24 @@ func (r *SettingsRepo) Upsert(ctx context.Context, userID string, savingsGoal in
 	if err != nil {
 		// Fallback to what we just wrote if the re-SELECT itself fails.
 		return Settings{SavingsGoal: savingsGoal, CycleStartDay: cycleStartDay}, nil
+	}
+	return out, nil
+}
+
+// Get returns the caller's settings row, or the DB column defaults
+// (savings_goal 0, cycle_start_day 1) when no row exists yet — never
+// sql.ErrNoRows, so callers never need a not-found branch for settings.
+func (r *SettingsRepo) Get(ctx context.Context, userID string) (Settings, error) {
+	var out Settings
+	err := r.db.QueryRowContext(ctx,
+		`SELECT savings_goal, cycle_start_day FROM user_settings WHERE user_id = ?`,
+		userID,
+	).Scan(&out.SavingsGoal, &out.CycleStartDay)
+	if err == sql.ErrNoRows {
+		return Settings{SavingsGoal: 0, CycleStartDay: 1}, nil
+	}
+	if err != nil {
+		return Settings{}, err
 	}
 	return out, nil
 }

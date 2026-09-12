@@ -21,3 +21,7 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-1-3-fixed-costs-savings-goal.md`
   summary: The internal/api router's HTTP-method-to-handler wiring (router.go) is never exercised by any test — every handler test calls the Go method directly, bypassing gin's routing — so a copy-paste method/handler mismatch (e.g. swapping PUT and DELETE on adjacent route registrations) would ship undetected.
   evidence: Systemic across the whole package (transactions/budgets/categories/incomes/fixed-costs/settings all share this gap), not unique to any one story. Closing it means one router-level (httptest.Server + h.Register) test pass covering every mounted route, not a per-story patch.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-1-5-safe-to-spend-dashboard.md`
+  summary: Story 1.5's frontend half — the `safe-to-spend-hero`, `CycleUpdateSheet` (income/fixed-costs/savings-goal/cycle-day editing via the existing `Modal`), and `DataContext` wiring (cycleSummary/fixedCosts state, saveCycleSettings/fixed-cost mutations, cross-refetch after transaction/settings changes) — split off from the backend `GET /cycle/summary` work to keep each spec under the token budget.
+  evidence: User-approved split at the token-count gate; the backend half ships first as its own reviewable/testable unit (consistent with Stories 1.2-1.4's backend-first pattern), and this frontend half is meant to be picked up immediately after in the same session, not deferred indefinitely.

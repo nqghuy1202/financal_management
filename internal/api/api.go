@@ -32,6 +32,8 @@ type Handler struct {
 	transactions *TransactionRepo
 	budgets      *BudgetRepo
 	fixedCosts   *FixedCostRepo
+	incomes      *IncomeRepo
+	settings     *SettingsRepo
 }
 
 func NewHandler(db *sql.DB, secret []byte) *Handler {
@@ -43,6 +45,8 @@ func NewHandler(db *sql.DB, secret []byte) *Handler {
 		transactions: NewTransactionRepo(db),
 		budgets:      NewBudgetRepo(db),
 		fixedCosts:   NewFixedCostRepo(db),
+		incomes:      NewIncomeRepo(db),
+		settings:     NewSettingsRepo(db),
 	}
 }
 
@@ -127,6 +131,20 @@ type Settings struct {
 type CycleSettingsResult struct {
 	Income   Income   `json:"income"`
 	Settings Settings `json:"settings"`
+}
+
+// CycleSummary is the fixed-shape response for GET /cycle/summary
+// (architecture spans FR-1/FR-6/FR-7 for this contract). Only FR-1 — this
+// story — computes real data: SafeToSpend/DaysRemaining/Income/
+// PreviousIncome. Budgets/ActiveAlerts ship empty until Epic 2 populates
+// them, without a contract change.
+type CycleSummary struct {
+	SafeToSpend    int64  `json:"safeToSpend"`
+	DaysRemaining  int    `json:"daysRemaining"`
+	Income         *int64 `json:"income"`
+	PreviousIncome *int64 `json:"previousIncome"`
+	Budgets        []any  `json:"budgets"`
+	ActiveAlerts   []any  `json:"activeAlerts"`
 }
 
 // ---- response helpers ----

@@ -65,3 +65,16 @@ func (r *TransactionRepo) Delete(ctx context.Context, userID, id string) error {
 	_, err := r.db.ExecContext(ctx, `DELETE FROM transactions WHERE id = ? AND user_id = ?`, id, userID)
 	return err
 }
+
+// SumExpensesInRange returns the total amount of expense-type transactions
+// with date in [from, to) for userID. Zero transactions yields 0, not an
+// error (COALESCE handles the no-rows case at the SQL level).
+func (r *TransactionRepo) SumExpensesInRange(ctx context.Context, userID string, from, to time.Time) (int64, error) {
+	var sum int64
+	err := r.db.QueryRowContext(ctx,
+		`SELECT COALESCE(SUM(amount), 0) FROM transactions
+		 WHERE user_id = ? AND type = 'expense' AND date >= ? AND date < ?`,
+		userID, from.Format(dateLayout), to.Format(dateLayout),
+	).Scan(&sum)
+	return sum, err
+}

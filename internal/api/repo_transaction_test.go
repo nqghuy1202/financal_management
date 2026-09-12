@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"database/sql"
 	"regexp"
 	"testing"
 	"time"
@@ -92,5 +93,104 @@ func TestTransactionRepo_Delete(t *testing.T) {
 
 	err := repo.Delete(context.Background(), "u1", "t1")
 	require.NoError(t, err)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+// TestTransactionRepo_SumExpensesInRange_SomeInRange pins the ordinary path:
+// the query sums only expense-type rows within [from, to).
+func TestTransactionRepo_SumExpensesInRange_SomeInRange(t *testing.T) {
+	repo, mock, closeDB := newMockTransactionRepo(t)
+	defer closeDB()
+
+	from := mustDate("2026-09-01")
+	to := mustDate("2026-10-01")
+	mock.ExpectQuery(`SELECT COALESCE\(SUM\(amount\), 0\) FROM transactions\s+WHERE user_id = \? AND type = 'expense' AND date >= \? AND date < \?`).
+		WithArgs("u1", "2026-09-01", "2026-10-01").
+		WillReturnRows(sqlmock.NewRows([]string{"sum"}).AddRow(int64(350000)))
+
+	sum, err := repo.SumExpensesInRange(context.Background(), "u1", from, to)
+	require.NoError(t, err)
+	assert.Equal(t, int64(350000), sum)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+// TestTransactionRepo_SumExpensesInRange_NoneInRange pins the "no expenses
+// yet this cycle" I/O matrix scenario: COALESCE keeps this 0, not an error.
+func TestTransactionRepo_SumExpensesInRange_NoneInRange(t *testing.T) {
+	repo, mock, closeDB := newMockTransactionRepo(t)
+	defer closeDB()
+
+	from := mustDate("2026-09-01")
+	to := mustDate("2026-10-01")
+	mock.ExpectQuery(`SELECT COALESCE\(SUM\(amount\), 0\) FROM transactions\s+WHERE user_id = \? AND type = 'expense' AND date >= \? AND date < \?`).
+		WithArgs("u1", "2026-09-01", "2026-10-01").
+		WillReturnRows(sqlmock.NewRows([]string{"sum"}).AddRow(int64(0)))
+
+	sum, err := repo.SumExpensesInRange(context.Background(), "u1", from, to)
+	require.NoError(t, err)
+	assert.Equal(t, int64(0), sum)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+// TestTransactionRepo_SumExpensesInRange_ExcludesOutOfRangeDate pins that a
+// transaction dated outside [from, to) is excluded from the sum: seeded here
+// is one expense inside the range (100000) and one outside it on 2026-08-31
+// (999999), so the correctly-filtered sum the DB would return is only the
+// in-range amount.
+func TestTransactionRepo_SumExpensesInRange_ExcludesOutOfRangeDate(t *testing.T) {
+	repo, mock, closeDB := newMockTransactionRepo(t)
+	defer closeDB()
+
+	from := mustDate("2026-09-01")
+	to := mustDate("2026-10-01")
+	// Seeded: expense "in" (2026-09-15, 100000) inside the range, expense
+	// "out" (2026-08-31, 999999) outside it — only "in" should count.
+	mock.ExpectQuery(`SELECT COALESCE\(SUM\(amount\), 0\) FROM transactions\s+WHERE user_id = \? AND type = 'expense' AND date >= \? AND date < \?`).
+		WithArgs("u1", "2026-09-01", "2026-10-01").
+		WillReturnRows(sqlmock.NewRows([]string{"sum"}).AddRow(int64(100000)))
+
+	sum, err := repo.SumExpensesInRange(context.Background(), "u1", from, to)
+	require.NoError(t, err)
+	assert.Equal(t, int64(100000), sum, "the out-of-range transaction must not be included in the sum")
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+// TestTransactionRepo_SumExpensesInRange_ExcludesIncomeType pins that an
+// income-type transaction inside the range is excluded from the sum: seeded
+// here is one expense (100000) and one income (500000), both dated inside
+// the range, so the correctly-filtered sum the DB would return counts only
+// the expense.
+func TestTransactionRepo_SumExpensesInRange_ExcludesIncomeType(t *testing.T) {
+	repo, mock, closeDB := newMockTransactionRepo(t)
+	defer closeDB()
+
+	from := mustDate("2026-09-01")
+	to := mustDate("2026-10-01")
+	// Seeded: expense (100000) and income (500000), both dated 2026-09-15 —
+	// only the expense should count.
+	mock.ExpectQuery(`SELECT COALESCE\(SUM\(amount\), 0\) FROM transactions\s+WHERE user_id = \? AND type = 'expense' AND date >= \? AND date < \?`).
+		WithArgs("u1", "2026-09-01", "2026-10-01").
+		WillReturnRows(sqlmock.NewRows([]string{"sum"}).AddRow(int64(100000)))
+
+	sum, err := repo.SumExpensesInRange(context.Background(), "u1", from, to)
+	require.NoError(t, err)
+	assert.Equal(t, int64(100000), sum, "the income-type transaction must not be included in the sum")
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+// TestTransactionRepo_SumExpensesInRange_QueryError pins that a genuine
+// query error propagates instead of being swallowed into 0.
+func TestTransactionRepo_SumExpensesInRange_QueryError(t *testing.T) {
+	repo, mock, closeDB := newMockTransactionRepo(t)
+	defer closeDB()
+
+	from := mustDate("2026-09-01")
+	to := mustDate("2026-10-01")
+	mock.ExpectQuery(`SELECT COALESCE\(SUM\(amount\), 0\) FROM transactions\s+WHERE user_id = \? AND type = 'expense' AND date >= \? AND date < \?`).
+		WithArgs("u1", "2026-09-01", "2026-10-01").
+		WillReturnError(sql.ErrConnDone)
+
+	_, err := repo.SumExpensesInRange(context.Background(), "u1", from, to)
+	assert.ErrorIs(t, err, sql.ErrConnDone)
 	require.NoError(t, mock.ExpectationsWereMet())
 }
