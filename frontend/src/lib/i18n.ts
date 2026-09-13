@@ -13,7 +13,6 @@ const vi: Dict = {
   'nav.transactions': 'Giao dịch',
   'nav.budgets': 'Ngân sách',
   'action.logout': 'Đăng xuất',
-  'topbar.search': 'Tìm kiếm giao dịch...',
   'common.cancel': 'Hủy',
   'common.save': 'Lưu',
   'common.add': 'Thêm',
@@ -146,13 +145,13 @@ const vi: Dict = {
   'bud.confirmDeleteCategory': 'Xóa danh mục "{name}"? Các ngân sách thuộc danh mục này cũng sẽ bị xóa.',
 
   // safe-to-spend hero
-  'sth.label': 'Safe-to-spend',
+  'sth.label': 'Số tiền an toàn để chi tiêu',
   'sth.daysRemaining': 'Còn {n} ngày trong chu kỳ này',
-  'sth.updateIncomePrompt': 'Cập nhật Lương để xem Safe-to-spend',
+  'sth.updateIncomePrompt': 'Cập nhật Lương để xem số tiền an toàn để chi tiêu',
   'sth.updateIncomeCta': 'Cập nhật Lương',
   'sth.editAria': 'Cập nhật chu kỳ',
   'sth.inaccurateHint': 'Chưa xác nhận chi phí cố định / mục tiêu tiết kiệm — số này có thể chưa chính xác.',
-  'sth.loadError': 'Không thể tải Safe-to-spend. Vui lòng thử lại.',
+  'sth.loadError': 'Không thể tải số tiền an toàn để chi tiêu. Vui lòng thử lại.',
   'sth.retry': 'Thử lại',
   'sth.overspentHint': 'Bạn đã chi vượt mức cho phép trong chu kỳ này.',
 
@@ -212,7 +211,6 @@ const en: Dict = {
   'nav.transactions': 'Transactions',
   'nav.budgets': 'Budgets',
   'action.logout': 'Log out',
-  'topbar.search': 'Search transactions...',
   'common.cancel': 'Cancel',
   'common.save': 'Save',
   'common.add': 'Add',
@@ -339,13 +337,13 @@ const en: Dict = {
   'bud.confirmDeleteCategory': 'Delete category "{name}"? Budgets under this category will also be deleted.',
 
   // safe-to-spend hero
-  'sth.label': 'Safe-to-spend',
+  'sth.label': 'Safe to spend',
   'sth.daysRemaining': '{n} days left in this cycle',
-  'sth.updateIncomePrompt': 'Update your income to see Safe-to-spend',
+  'sth.updateIncomePrompt': 'Update your income to see Safe to spend',
   'sth.updateIncomeCta': 'Update income',
   'sth.editAria': 'Update cycle',
   'sth.inaccurateHint': 'Fixed costs / savings goal not confirmed yet — this number may be inaccurate.',
-  'sth.loadError': "Couldn't load Safe-to-spend. Please try again.",
+  'sth.loadError': "Couldn't load Safe to spend. Please try again.",
   'sth.retry': 'Retry',
   'sth.overspentHint': "You've gone over budget for this cycle.",
 

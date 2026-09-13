@@ -29,27 +29,25 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 # - Retrospective appends its action items to action_items; the status view surfaces open ones
 generated: 09-12-2026 08:26
-last_updated: 09-13-2026 10:15
+last_updated: 09-13-2026 11:00
 project: financal_management
 project_key: NOKEY
 tracking_system: file-system
 story_location: _bmad-output/implementation-artifacts
 development_status:
-  epic-1: in-progress
-  1-1-hoàn-thiện-xác-thực-refactor-repository-layer-hiện-có: review
-  1-2-khai-báo-lương-cho-chu-kỳ-hiện-tại: review
-  1-3-quản-lý-chi-phí-cố-định-và-mục-tiêu-tiết-kiệm: review
-  1-4-cấu-hình-ngày-bắt-đầu-chu-kỳ-ngân-sách: review
-  1-5-hiển-thị-safe-to-spend-trên-dashboard: review
+  epic-1: done
+  1-1-hoàn-thiện-xác-thực-refactor-repository-layer-hiện-có: done
+  1-2-khai-báo-lương-cho-chu-kỳ-hiện-tại: done
+  1-3-quản-lý-chi-phí-cố-định-và-mục-tiêu-tiết-kiệm: done
+  1-4-cấu-hình-ngày-bắt-đầu-chu-kỳ-ngân-sách: done
+  1-5-hiển-thị-safe-to-spend-trên-dashboard: done
   epic-1-retrospective: optional
 
-  epic-2: in-progress
+  epic-2: done
   2-1-phát-cảnh-báo-khi-giao-dịch-vượt-ngưỡng-ngân-sách: done
   2-2-xem-và-đóng-cảnh-báo-ngân-sách-trên-dashboard: done
-  2-3-xem-trạng-thái-3-mức-ngân-sách-theo-danh-mục: backlog
+  2-3-xem-trạng-thái-3-mức-ngân-sách-theo-danh-mục: done
   epic-2-retrospective: optional
 
-  epic-3: backlog
-  3-1-gắn-cờ-giao-dịch-bất-thường-khi-lưu: backlog
-  3-2-xem-lý-do-và-đánh-dấu-đã-xem-cờ-bất-thường: backlog
-  epic-3-retrospective: optional
+  # epic-3 (Tự nhận ra chi tiêu bất thường) cắt khỏi scope 2026-09-13 —
+  # xem _bmad-output/planning-artifacts/sprint-change-proposal-2026-09-13.md

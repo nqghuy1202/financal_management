@@ -45,9 +45,14 @@ export function Dashboard() {
 
   const trend = useMemo(() => monthlyTrend(transactions, 6), [transactions])
   const breakdown = useMemo(() => expenseBreakdown(monthTxs, categories), [monthTxs, categories])
+  // Budget status must use the current *cycle*'s month (AD-4), which can
+  // differ from the wall-clock's own calendar month `month` above when
+  // cycleStartDay isn't 1 — this is what keeps this widget's status in
+  // agreement with the Budgets page (Story 2.3's AC2).
+  const budgetMonth = cycleSummary?.currentMonth ?? month
   const budgetRows = useMemo(
-    () => budgetProgress(budgets, transactions, categories, month).slice(0, 4),
-    [budgets, transactions, categories, month],
+    () => budgetProgress(budgets, categories, budgetMonth).slice(0, 4),
+    [budgets, categories, budgetMonth],
   )
   const recent = useMemo(() => transactions.slice(0, 5), [transactions])
 
@@ -255,7 +260,8 @@ export function Dashboard() {
           ) : (
             <ul className="space-y-4">
               {budgetRows.map((b) => {
-                const over = b.percent > 100
+                const barColor =
+                  b.status === 'over' ? 'bg-rose-500' : b.status === 'near' ? 'bg-amber-500' : 'bg-brand-500'
                 return (
                   <li key={b.budget.id}>
                     <div className="mb-1.5 flex items-center justify-between text-sm">
@@ -269,7 +275,7 @@ export function Dashboard() {
                     </div>
                     <div className="h-2 overflow-hidden rounded-full bg-ink-100">
                       <div
-                        className={`h-full rounded-full ${over ? 'bg-rose-500' : 'bg-brand-500'}`}
+                        className={`h-full rounded-full ${barColor}`}
                         style={{ width: `${Math.min(b.percent, 100)}%` }}
                       />
                     </div>

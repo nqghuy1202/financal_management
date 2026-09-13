@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<title>Dashboard mock — HL Personal Finance</title>
+<style>
+  :root {
+    --brand-50:#ecfdf5; --brand-500:#10b981; --brand-600:#059669; --brand-700:#047857;
+    --ink-50:#f8fafc; --ink-100:#f1f5f9; --ink-400:#94a3b8; --ink-500:#64748b; --ink-800:#1e293b; --ink-900:#0f172a;
+    --amber-50:#fffbeb; --amber-200:#fde68a; --amber-700:#b45309; --amber-800:#92400e;
+    --rose-50:#fff1f2; --rose-200:#fecdd3; --rose-700:#be123c; --rose-800:#9f1239;
+    --anomaly-50:#f5f3ff; --anomaly-700:#6d28d9;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--ink-50); color:var(--ink-800); font-family:Inter, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; }
+  .wrap { max-width:420px; margin:0 auto; padding:16px; } /* mobile-first frame per Foundation */
+  .card { background:#fff; border:1px solid var(--ink-100); border-radius:1rem; box-shadow:0 1px 2px rgba(0,0,0,.04); }
+  .hero { background:var(--brand-50); border:1px solid rgba(16,185,129,.2); border-radius:1rem; padding:20px; margin-bottom:12px; }
+  .hero-label { font-size:13px; color:var(--brand-700); font-weight:600; display:flex; justify-content:space-between; align-items:center; }
+  .hero-number { font-size:40px; font-weight:800; line-height:1.1; letter-spacing:-0.01em; font-variant-numeric:tabular-nums; margin:6px 0 4px; color:var(--ink-900); }
+  .hero-sub { font-size:13px; color:var(--ink-500); }
+  .pencil { width:32px; height:32px; border-radius:0.75rem; background:rgba(16,185,129,.12); display:flex; align-items:center; justify-content:center; color:var(--brand-700); font-size:14px; }
+  .banner { display:flex; gap:10px; align-items:flex-start; border-radius:1rem; padding:12px 14px; margin-bottom:8px; border-left-width:4px; border-left-style:solid; }
+  .banner.near { background:var(--amber-50); border-color:#f59e0b; color:var(--amber-800); }
+  .banner.over { background:var(--rose-50); border-color:#e11d48; color:var(--rose-800); }
+  .banner .text { flex:1; font-size:13px; }
+  .banner .close { cursor:pointer; opacity:.6; font-size:13px; }
+  .stat-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin:16px 0; }
+  .stat { padding:16px; }
+  .stat-label { font-size:13px; color:var(--ink-500); }
+  .stat-value { font-size:22px; font-weight:700; margin-top:6px; font-variant-numeric:tabular-nums; }
+  .section-title { font-size:15px; font-weight:600; margin:20px 0 10px; }
+  .budget-row { display:flex; justify-content:space-between; align-items:center; padding:10px 14px; }
+  .pill { font-size:11px; font-weight:600; padding:3px 9px; border-radius:9999px; }
+  .pill.within { background:var(--brand-50); color:var(--brand-700); }
+  .pill.near { background:var(--amber-50); color:var(--amber-700); }
+  .pill.over { background:var(--rose-50); color:var(--rose-700); }
+  .tx-row { display:flex; align-items:center; gap:10px; padding:10px 14px; border-top:1px solid var(--ink-100); }
+  .tx-row:first-child { border-top:none; }
+  .badge-anomaly { display:inline-flex; align-items:center; gap:4px; font-size:11px; font-weight:600; background:var(--anomaly-50); color:var(--anomaly-700); padding:2px 8px; border-radius:9999px; margin-right:6px; }
+  .tx-name { font-size:13px; font-weight:500; }
+  .tx-meta { font-size:11px; color:var(--ink-400); }
+  .amount { margin-left:auto; font-size:13px; font-weight:600; font-variant-numeric:tabular-nums; }
+  .caption { font-size:11px; color:var(--ink-400); text-align:center; margin-top:16px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- safe-to-spend-hero — realizes FR-1; luôn full-width, trên cùng -->
+  <div class="hero">
+    <div class="hero-label">
+      HÔM NAY CÒN TIÊU ĐƯỢC
+      <span class="pencil">✎</span>
+    </div>
+    <div class="hero-number">185.000đ</div>
+    <div class="hero-sub">Còn 6 ngày trong chu kỳ này</div>
+  </div>
+
+  <!-- alert-banner list — FR-5/FR-6, rose trước amber, tối đa 3 -->
+  <div class="banner over">
+    <div class="text"><strong>Ăn uống</strong>: đã dùng 104% ngân sách, còn 6 ngày</div>
+    <div class="close">✕</div>
+  </div>
+  <div class="banner near">
+    <div class="text"><strong>Giải trí</strong>: đã dùng 92% ngân sách, còn 6 ngày</div>
+    <div class="close">✕</div>
+  </div>
+
+  <!-- stat cards hiện có — không đổi -->
+  <div class="stat-grid">
+    <div class="card stat">
+      <div class="stat-label">Số dư tháng này</div>
+      <div class="stat-value">4.250.000đ</div>
+    </div>
+    <div class="card stat">
+      <div class="stat-label">Chi tiêu</div>
+      <div class="stat-value">6.180.000đ</div>
+    </div>
+  </div>
+
+  <!-- budget-status-pill — 3 trạng thái theo FR-7 -->
+  <div class="section-title">Ngân sách</div>
+  <div class="card">
+    <div class="budget-row">
+      <span>Ăn uống</span><span class="pill over">Đã vượt</span>
+    </div>
+    <div class="budget-row" style="border-top:1px solid var(--ink-100)">
+      <span>Giải trí</span><span class="pill near">Gần vượt</span>
+    </div>
+    <div class="budget-row" style="border-top:1px solid var(--ink-100)">
+      <span>Đi lại</span><span class="pill within">Trong hạn mức</span>
+    </div>
+  </div>
+
+  <!-- anomaly-badge trên dòng giao dịch — FR-8/FR-9 -->
+  <div class="section-title">Giao dịch gần đây</div>
+  <div class="card">
+    <div class="tx-row">
+      <span class="badge-anomaly">ⓘ Bất thường</span>
+      <div>
+        <div class="tx-name">Mua sắm đột xuất</div>
+        <div class="tx-meta">Mua sắm • Hôm nay</div>
+      </div>
+      <div class="amount">-1.200.000đ</div>
+    </div>
+    <div class="tx-row">
+      <div>
+        <div class="tx-name">Ăn trưa</div>
+        <div class="tx-meta">Ăn uống • Hôm qua</div>
+      </div>
+      <div class="amount">-85.000đ</div>
+    </div>
+  </div>
+
+  <p class="caption">Mock tĩnh — minh hoạ bố cục hàng trên cùng mới (hero + banner) trên nền Dashboard hiện có. Không phải pixel-final; DESIGN.md/EXPERIENCE.md thắng khi có mâu thuẫn.</p>
+</div>
+</body>
+</html>

@@ -273,3 +273,52 @@ func TestDemo_SeedingFailureRollsBack(t *testing.T) {
 	assert.NotContains(t, w.Body.String(), `"token"`)
 	require.NoError(t, mock.ExpectationsWereMet())
 }
+
+// TestDemo_SampleDataFailureRollsBack pins seedSampleData's own error
+// propagation (added by Story 1.1's refactor): unlike the pre-refactor code,
+// which discarded each sample insert's error and let the demo account
+// succeed with partial data, a failure inside seedSampleData now aborts and
+// rolls back the whole withTx — including the already-inserted user and
+// categories. TestDemo_SeedingFailureRollsBack only exercises a failure
+// during SeedDefaults, before seedSampleData ever runs; this test reaches
+// seedSampleData itself by letting user + category creation succeed first.
+func TestDemo_SampleDataFailureRollsBack(t *testing.T) {
+	h, mock, closeDB := newTestHandler(t)
+	defer closeDB()
+
+	mock.ExpectBegin()
+
+	mock.ExpectExec(`INSERT INTO users \(id, name, email, password_hash\) VALUES \(\?, \?, \?, \?\)`).
+		WithArgs(sqlmock.AnyArg(), "Demo", sqlmock.AnyArg(), sqlmock.AnyArg()).
+		WillReturnResult(sqlmock.NewResult(1, 1))
+
+	seededNames := make([]string, 0, len(defaultCategories))
+	for _, cat := range defaultCategories {
+		mock.ExpectExec(`INSERT INTO categories \(id, user_id, name, type, color, icon\) VALUES \(\?, \?, \?, \?, \?, \?\)`).
+			WithArgs(sqlmock.AnyArg(), sqlmock.AnyArg(), cat.Name, cat.Type, cat.Color, cat.Icon).
+			WillReturnResult(sqlmock.NewResult(1, 1))
+		seededNames = append(seededNames, cat.Name)
+	}
+
+	byNameRows := sqlmock.NewRows([]string{"id", "name"})
+	for _, name := range seededNames {
+		byNameRows.AddRow("id-"+name, name)
+	}
+	mock.ExpectQuery(`SELECT id, name FROM categories WHERE user_id = \?`).
+		WithArgs(sqlmock.AnyArg()).
+		WillReturnRows(byNameRows)
+
+	// The very first sample transaction insert fails — everything already
+	// staged in this transaction (user + all seeded categories) must roll
+	// back rather than commit with a demo account left half-seeded.
+	mock.ExpectExec(`INSERT INTO transactions \(id, user_id, type, amount, category_id, note, date\)\s+VALUES \(\?, \?, \?, \?, \?, \?, \?\)`).
+		WillReturnError(sql.ErrConnDone)
+	mock.ExpectRollback()
+
+	w, c := plainRequest("POST", "/api/auth/demo", "", nil)
+	h.Demo(c)
+
+	assert.Equal(t, http.StatusInternalServerError, w.Code)
+	assert.NotContains(t, w.Body.String(), `"token"`)
+	require.NoError(t, mock.ExpectationsWereMet())
+}

@@ -10,6 +10,14 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// expectSumExpensesInCategory mocks TransactionRepo.SumExpensesInCategory
+// (Story 2.3's non-excluding spend sum, used by GET/POST /budgets).
+func expectSumExpensesInCategory(mock sqlmock.Sqlmock, userID, categoryID, from, to string, spent int64) {
+	mock.ExpectQuery(`SELECT COALESCE\(SUM\(amount\), 0\) FROM transactions\s+WHERE user_id = \? AND category_id = \? AND type = 'expense' AND date >= \? AND date < \?`).
+		WithArgs(userID, categoryID, from, to).
+		WillReturnRows(sqlmock.NewRows([]string{"sum"}).AddRow(spent))
+}
+
 func TestListBudgets_HappyPath(t *testing.T) {
 	h, mock, closeDB := newTestHandler(t)
 	defer closeDB()
@@ -19,12 +27,17 @@ func TestListBudgets_HappyPath(t *testing.T) {
 	mock.ExpectQuery(`SELECT id, category_id, limit_amount, month FROM budgets WHERE user_id = \?`).
 		WithArgs("u1").
 		WillReturnRows(rows)
+	expectSettingsGet(mock, "u1", 0, 1)
+	expectSumExpensesInCategory(mock, "u1", "c1", "2026-09-01", "2026-10-01", 2100000)
 
 	w, c := authedRequest("GET", "/api/budgets", "", "u1", nil)
 	h.ListBudgets(c)
 
 	assert.Equal(t, http.StatusOK, w.Code)
 	assert.Contains(t, w.Body.String(), `"code":20000`)
+	assert.Contains(t, w.Body.String(), `"spent":2100000`)
+	assert.Contains(t, w.Body.String(), `"percent":70`)
+	assert.Contains(t, w.Body.String(), `"status":"near"`)
 	require.NoError(t, mock.ExpectationsWereMet())
 }
 
@@ -99,6 +112,8 @@ func TestUpsertBudget_Idempotency(t *testing.T) {
 		WithArgs("u1", "c1", "2026-09").
 		WillReturnRows(sqlmock.NewRows([]string{"id", "category_id", "limit_amount", "month"}).
 			AddRow("b1", "c1", int64(1000000), "2026-09"))
+	expectSettingsGet(mock, "u1", 0, 1)
+	expectSumExpensesInCategory(mock, "u1", "c1", "2026-09-01", "2026-10-01", 0)
 
 	body1 := `{"categoryId":"c1","limit":1000000,"month":"2026-09"}`
 	w1, c1 := authedRequest("POST", "/api/budgets", body1, "u1", nil)
@@ -116,6 +131,8 @@ func TestUpsertBudget_Idempotency(t *testing.T) {
 		WithArgs("u1", "c1", "2026-09").
 		WillReturnRows(sqlmock.NewRows([]string{"id", "category_id", "limit_amount", "month"}).
 			AddRow("b1", "c1", int64(2500000), "2026-09"))
+	expectSettingsGet(mock, "u1", 0, 1)
+	expectSumExpensesInCategory(mock, "u1", "c1", "2026-09-01", "2026-10-01", 0)
 
 	body2 := `{"categoryId":"c1","limit":2500000,"month":"2026-09"}`
 	w2, c2 := authedRequest("POST", "/api/budgets", body2, "u1", nil)
@@ -139,4 +156,5 @@ func TestDeleteBudget_HappyPath(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, w.Code)
 	assert.Contains(t, w.Body.String(), `"deleted":true`)
+	require.NoError(t, mock.ExpectationsWereMet())
 }

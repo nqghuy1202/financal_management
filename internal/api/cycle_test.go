@@ -263,3 +263,71 @@ func TestAlertStatus_BelowHundredIsNear(t *testing.T) {
 func TestAlertStatus_AboveHundredIsOver(t *testing.T) {
 	assert.Equal(t, "over", AlertStatus(150))
 }
+
+// TestBudgetStatus pins the 3-level boundaries (Story 2.3): within <70%,
+// near 70-99%, over >=100%.
+func TestBudgetStatus(t *testing.T) {
+	cases := []struct {
+		name         string
+		spent, limit int64
+		wantPercent  int
+		wantStatus   string
+	}{
+		{"zero spent", 0, 1000000, 0, "within"},
+		{"just below near", 699000, 1000000, 69, "within"},
+		{"exactly at near boundary", 700000, 1000000, 70, "near"},
+		{"just below over", 999000, 1000000, 99, "near"},
+		{"exactly at over boundary", 1000000, 1000000, 100, "over"},
+		{"over by a lot", 1500000, 1000000, 150, "over"},
+		{"non-positive limit has no meaningful percent", 500000, 0, 0, "within"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			percent, status := BudgetStatus(tc.spent, tc.limit)
+			assert.Equal(t, tc.wantPercent, percent)
+			assert.Equal(t, tc.wantStatus, status)
+		})
+	}
+}
+
+// TestCycleWindowForMonth_Day1PlainCase pins the common case: with
+// cycleStartDay=1, a budget's month label matches the calendar month's own
+// window.
+func TestCycleWindowForMonth_Day1PlainCase(t *testing.T) {
+	start, end, err := CycleWindowForMonth(1, "2026-09")
+	require.NoError(t, err)
+	assert.Equal(t, mustDate("2026-09-01"), start)
+	assert.Equal(t, mustDate("2026-10-01"), end)
+}
+
+// TestCycleWindowForMonth_ClampShortMonth pins that a cycleStartDay not
+// present in the labeled month (31 in a 30-day September) clamps to that
+// month's last day, same as CycleWindow does directly.
+func TestCycleWindowForMonth_ClampShortMonth(t *testing.T) {
+	start, end, err := CycleWindowForMonth(31, "2026-09")
+	require.NoError(t, err)
+	assert.Equal(t, mustDate("2026-09-30"), start)
+	assert.Equal(t, mustDate("2026-10-31"), end)
+}
+
+// TestCycleWindowForMonth_ReinterpretedByCurrentSetting pins AD-4: the same
+// "2026-09" label resolves to a different window once cycleStartDay changes
+// — nothing about the label itself is tied to whatever setting was in
+// effect when the row was created.
+func TestCycleWindowForMonth_ReinterpretedByCurrentSetting(t *testing.T) {
+	startDay1, endDay1, err := CycleWindowForMonth(1, "2026-09")
+	require.NoError(t, err)
+	startDay15, endDay15, err := CycleWindowForMonth(15, "2026-09")
+	require.NoError(t, err)
+	assert.NotEqual(t, startDay1, startDay15)
+	assert.NotEqual(t, endDay1, endDay15)
+	assert.Equal(t, mustDate("2026-09-15"), startDay15)
+	assert.Equal(t, mustDate("2026-10-15"), endDay15)
+}
+
+// TestCycleWindowForMonth_MalformedMonth pins that an invalid month string
+// returns an error rather than a zero-value window silently passed on.
+func TestCycleWindowForMonth_MalformedMonth(t *testing.T) {
+	_, _, err := CycleWindowForMonth(1, "not-a-month")
+	assert.Error(t, err)
+}

@@ -17,11 +17,18 @@ export interface Transaction {
   date: string // ISO yyyy-mm-dd
 }
 
+// spent/percent/status are computed fresh by the backend on every
+// GET/POST /budgets (Story 2.3) — the Budgets page and Dashboard both read
+// these directly instead of recomputing locally, so the two surfaces can
+// never disagree.
 export interface Budget {
   id: string
   categoryId: string
   limit: number
   month: string // yyyy-mm
+  spent: number
+  percent: number
+  status: 'within' | 'near' | 'over'
 }
 
 export interface User {
@@ -65,7 +72,9 @@ export interface ActiveAlert {
   status: 'near' | 'over'
 }
 
-// Response shape of GET /cycle/summary.
+// Response shape of GET /cycle/summary. savingsGoal/cycleStartDay are folded
+// in here rather than served from a separate GET /settings (which doesn't
+// exist) — see DataContext's initial load.
 export interface CycleSummary {
   safeToSpend: number
   daysRemaining: number
@@ -73,6 +82,13 @@ export interface CycleSummary {
   previousIncome: number | null
   budgets: BudgetStatus[]
   activeAlerts: ActiveAlert[]
+  savingsGoal: number
+  cycleStartDay: number
+  // currentMonth is the "yyyy-mm" budgets.month value for the current cycle
+  // (AD-4) — use this instead of today's own calendar month wherever
+  // "current" budgets/cycle are being matched, since cycleStartDay other
+  // than 1 can make them differ.
+  currentMonth: string
 }
 
 // Request body of PUT /cycle-settings — the sheet's one Save action.

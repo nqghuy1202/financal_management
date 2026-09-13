@@ -81,6 +81,9 @@ func (h *Handler) GetCycleSummary(c *gin.Context) {
 		PreviousIncome: previousIncomePtr,
 		Budgets:        []any{},
 		ActiveAlerts:   alerts,
+		SavingsGoal:    settings.SavingsGoal,
+		CycleStartDay:  settings.CycleStartDay,
+		CurrentMonth:   cycleStart.Format("2006-01"),
 	})
 }
 

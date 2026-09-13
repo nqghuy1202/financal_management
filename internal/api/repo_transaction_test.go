@@ -19,13 +19,22 @@ func newMockTransactionRepo(t *testing.T) (*TransactionRepo, sqlmock.Sqlmock, fu
 	return NewTransactionRepo(db), mock, func() { db.Close() }
 }
 
+// TestTransactionRepo_List_DateRoundTrip pins the full create-then-list
+// round trip: Create writes the date as the "yyyy-mm-dd" string the caller
+// passed in, and List's Scan/Format of the DB's DATE column must reproduce
+// that exact string back, with no TZ drift.
 func TestTransactionRepo_List_DateRoundTrip(t *testing.T) {
 	repo, mock, closeDB := newMockTransactionRepo(t)
 	defer closeDB()
 
+	tx := Transaction{ID: "t1", Type: "expense", Amount: 50000, CategoryID: "c1", Note: "trưa", Date: "2026-09-12"}
+	mock.ExpectExec(`INSERT INTO transactions \(id, user_id, type, amount, category_id, note, date\)\s+VALUES \(\?, \?, \?, \?, \?, \?, \?\)`).
+		WithArgs(tx.ID, "u1", tx.Type, tx.Amount, tx.CategoryID, tx.Note, tx.Date).
+		WillReturnResult(sqlmock.NewResult(1, 1))
+	require.NoError(t, repo.Create(context.Background(), "u1", tx))
+
 	d, err := time.Parse(dateLayout, "2026-09-12")
 	require.NoError(t, err)
-
 	rows := sqlmock.NewRows([]string{"id", "type", "amount", "category_id", "note", "date"}).
 		AddRow("t1", "expense", int64(50000), "c1", "trưa", d)
 	mock.ExpectQuery(`SELECT id, type, amount, COALESCE\(category_id, ''\), note, date\s+FROM transactions WHERE user_id = \? ORDER BY date DESC, created_at DESC`).
@@ -36,7 +45,23 @@ func TestTransactionRepo_List_DateRoundTrip(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, list, 1)
 	assert.Equal(t, "2026-09-12", list[0].Date, "date must round-trip with no TZ drift")
-	assert.Equal(t, Transaction{ID: "t1", Type: "expense", Amount: 50000, CategoryID: "c1", Note: "trưa", Date: "2026-09-12"}, list[0])
+	assert.Equal(t, tx, list[0])
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+// TestTransactionRepo_List_QueryError pins that a genuine query error
+// propagates instead of being swallowed into an empty list.
+func TestTransactionRepo_List_QueryError(t *testing.T) {
+	repo, mock, closeDB := newMockTransactionRepo(t)
+	defer closeDB()
+
+	mock.ExpectQuery(`SELECT id, type, amount, COALESCE\(category_id, ''\), note, date\s+FROM transactions WHERE user_id = \? ORDER BY date DESC, created_at DESC`).
+		WithArgs("u1").
+		WillReturnError(sql.ErrConnDone)
+
+	_, err := repo.List(context.Background(), "u1")
+	assert.ErrorIs(t, err, sql.ErrConnDone)
+	require.NoError(t, mock.ExpectationsWereMet())
 }
 
 func TestTransactionRepo_Create(t *testing.T) {
@@ -191,6 +216,41 @@ func TestTransactionRepo_SumExpensesInRange_QueryError(t *testing.T) {
 		WillReturnError(sql.ErrConnDone)
 
 	_, err := repo.SumExpensesInRange(context.Background(), "u1", from, to)
+	assert.ErrorIs(t, err, sql.ErrConnDone)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+// TestTransactionRepo_SumExpensesInCategory pins the plain (non-excluding)
+// sum used by GET/POST /budgets (Story 2.3).
+func TestTransactionRepo_SumExpensesInCategory(t *testing.T) {
+	repo, mock, closeDB := newMockTransactionRepo(t)
+	defer closeDB()
+
+	from := mustDate("2026-09-01")
+	to := mustDate("2026-10-01")
+	mock.ExpectQuery(`SELECT COALESCE\(SUM\(amount\), 0\) FROM transactions\s+WHERE user_id = \? AND category_id = \? AND type = 'expense' AND date >= \? AND date < \?`).
+		WithArgs("u1", "c1", "2026-09-01", "2026-10-01").
+		WillReturnRows(sqlmock.NewRows([]string{"sum"}).AddRow(int64(700000)))
+
+	sum, err := repo.SumExpensesInCategory(context.Background(), "u1", "c1", from, to)
+	require.NoError(t, err)
+	assert.Equal(t, int64(700000), sum)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+// TestTransactionRepo_SumExpensesInCategory_QueryError pins that a genuine
+// query error propagates instead of being swallowed into 0.
+func TestTransactionRepo_SumExpensesInCategory_QueryError(t *testing.T) {
+	repo, mock, closeDB := newMockTransactionRepo(t)
+	defer closeDB()
+
+	from := mustDate("2026-09-01")
+	to := mustDate("2026-10-01")
+	mock.ExpectQuery(`SELECT COALESCE\(SUM\(amount\), 0\) FROM transactions\s+WHERE user_id = \? AND category_id = \? AND type = 'expense' AND date >= \? AND date < \?`).
+		WithArgs("u1", "c1", "2026-09-01", "2026-10-01").
+		WillReturnError(sql.ErrConnDone)
+
+	_, err := repo.SumExpensesInCategory(context.Background(), "u1", "c1", from, to)
 	assert.ErrorIs(t, err, sql.ErrConnDone)
 	require.NoError(t, mock.ExpectationsWereMet())
 }

@@ -32,6 +32,21 @@ func TestBudgetRepo_List(t *testing.T) {
 	assert.Equal(t, []Budget{{ID: "b1", CategoryID: "c1", Limit: 3000000, Month: "2026-09"}}, list)
 }
 
+// TestBudgetRepo_List_QueryError pins that a genuine query error propagates
+// instead of being swallowed into an empty list.
+func TestBudgetRepo_List_QueryError(t *testing.T) {
+	repo, mock, closeDB := newMockBudgetRepo(t)
+	defer closeDB()
+
+	mock.ExpectQuery(`SELECT id, category_id, limit_amount, month FROM budgets WHERE user_id = \?`).
+		WithArgs("u1").
+		WillReturnError(sql.ErrConnDone)
+
+	_, err := repo.List(context.Background(), "u1")
+	assert.ErrorIs(t, err, sql.ErrConnDone)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
 func TestBudgetRepo_Upsert_Insert(t *testing.T) {
 	repo, mock, closeDB := newMockBudgetRepo(t)
 	defer closeDB()

@@ -52,6 +52,21 @@ func TestCategoryRepo_List_Empty(t *testing.T) {
 	assert.Empty(t, list)
 }
 
+// TestCategoryRepo_List_QueryError pins that a genuine query error
+// propagates instead of being swallowed into an empty list.
+func TestCategoryRepo_List_QueryError(t *testing.T) {
+	repo, mock, closeDB := newMockCategoryRepo(t)
+	defer closeDB()
+
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT id, name, type, color, icon FROM categories WHERE user_id = ? ORDER BY created_at`)).
+		WithArgs("u1").
+		WillReturnError(sql.ErrConnDone)
+
+	_, err := repo.List(context.Background(), "u1")
+	assert.ErrorIs(t, err, sql.ErrConnDone)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
 func TestCategoryRepo_Create(t *testing.T) {
 	repo, mock, closeDB := newMockCategoryRepo(t)
 	defer closeDB()

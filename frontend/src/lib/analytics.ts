@@ -64,31 +64,30 @@ export interface BudgetProgress {
   category: Category
   spent: number
   percent: number
+  status: Budget['status']
   remaining: number
 }
 
-export function budgetProgress(
-  budgets: Budget[],
-  txs: Transaction[],
-  categories: Category[],
-  month: string,
-): BudgetProgress[] {
-  const monthTxs = filterByMonth(txs, month).filter((t) => t.type === 'expense')
+// budgetProgress pairs each of the current cycle's budgets with its
+// category for display. spent/percent/status come straight from the
+// backend (Story 2.3, GET /budgets) — never recomputed here — so the
+// Budgets page and Dashboard, which both call this, can never disagree with
+// each other or with the server. `month` should be cycleSummary.currentMonth
+// (AD-4), not the wall-clock's own calendar month.
+export function budgetProgress(budgets: Budget[], categories: Category[], month: string): BudgetProgress[] {
   return budgets
     .filter((b) => b.month === month)
     .map((budget) => {
-      const spent = monthTxs
-        .filter((t) => t.categoryId === budget.categoryId)
-        .reduce((s, t) => s + t.amount, 0)
       const category =
         categories.find((c) => c.id === budget.categoryId) ??
         ({ id: budget.categoryId, name: 'Khác', type: 'expense', color: '#64748b', icon: 'MoreHorizontal' } as Category)
       return {
         budget,
         category,
-        spent,
-        percent: budget.limit ? (spent / budget.limit) * 100 : 0,
-        remaining: budget.limit - spent,
+        spent: budget.spent,
+        percent: budget.percent,
+        status: budget.status,
+        remaining: budget.limit - budget.spent,
       }
     })
     .sort((a, b) => b.percent - a.percent)

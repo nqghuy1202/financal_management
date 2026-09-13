@@ -7,8 +7,6 @@ import {
   LogOut,
   Menu,
   X,
-  Search,
-  Bell,
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { useI18n } from '../context/I18nContext'
@@ -107,17 +105,8 @@ export function AppLayout() {
             {mobileOpen ? <X size={20} /> : <Menu size={20} />}
           </button>
 
-          <div className="relative hidden max-w-xs flex-1 sm:block">
-            <Search size={17} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-400" />
-            <input className="input !pl-9" placeholder={t('topbar.search')} />
-          </div>
-
           <div className="ml-auto flex items-center gap-3">
             <LanguageToggle className="hidden sm:inline-flex" />
-            <button className="btn-icon relative" aria-label="Notifications">
-              <Bell size={19} />
-              <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-brand-500" />
-            </button>
             <div className="flex items-center gap-2.5">
               <div className="flex h-9 w-9 items-center justify-center rounded-full bg-brand-100 text-sm font-semibold text-brand-700">
                 {initials}

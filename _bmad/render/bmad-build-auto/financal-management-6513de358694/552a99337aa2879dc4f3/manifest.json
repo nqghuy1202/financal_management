@@ -1,0 +1,69 @@
+{
+  "generation_hash": "552a99337aa2879dc4f3",
+  "inputs": {
+    "project_root": "D:\\Personal_Project\\financal_management",
+    "renderer_sha256": "06d9f62116f929b5fa6ebe302c73eaabeba4b4ce7273124f5213e9900816279a",
+    "resolved_values": {
+      "config.modules.bmm.implementation_artifacts": "D:\\Personal_Project\\financal_management/_bmad-output/implementation-artifacts",
+      "config.modules.bmm.planning_artifacts": "D:\\Personal_Project\\financal_management/_bmad-output/planning-artifacts",
+      "customization.workflow.activation_steps_append": [],
+      "customization.workflow.activation_steps_prepend": [],
+      "customization.workflow.implementation_handoff": "Launch a subagent with no prior conversation context, with this prompt:\n\n> Read {spec_file} fully and implement it — the spec is the sole source of truth. Load every file listed in its frontmatter `context:` before you start.\n>\n> When done, report what you changed, how you verified it, and anything left incomplete or risky.\n",
+      "customization.workflow.on_complete": "",
+      "customization.workflow.persistent_facts": [],
+      "customization.workflow.review_layers": [
+        {
+          "id": "blind-hunter",
+          "instruction": "Launch a context-free subagent with this prompt:\n\nConduct a review of CONTENT.\nLook for what's missing, not only what's wrong.\nCompute your finding floor N from the diff file's size: N = min(floor(sqrt(kB) + 1), 10), where kB is the file's size in kilobytes. State the arithmetic in one line, then find at least N issues to fix or improve.\nOutput a Markdown list of findings only — no severity, priority, or ranking.\nIf the content is empty, stop and say so.\nIf you have zero findings, re-check and keep thinking; do not stop with an empty list.\n\nCONTENT: the unified diff at `{diff_file}`. Read that file — it is the content under review.\n\nDo not invoke any skill, and do not spawn subagents of your own — you are the reviewer. Return your findings as text in your final message; do not route them through any findings-reporting tool the host may offer.\n\n",
+          "name": "Blind Hunter"
+        },
+        {
+          "id": "edge-case-hunter",
+          "instruction": "Launch a context-free subagent with this prompt:\n\nRead `{skill-root}/review-prompts/edge-case-hunter.md` completely and follow it as your review instructions.\n\nclaims_file (leave unread until your instructions call for it): {claims_file}\n\nReview content: the unified diff at `{diff_file}`. Read that file — it is the content under review.\n\nDo not invoke any skill, and do not spawn subagents of your own — you are the reviewer. If the instruction file is unreadable, report that exact failure and stop. Return your findings as text in your final message; do not route them through any findings-reporting tool the host may offer.\n\n",
+          "name": "Edge Case Hunter"
+        },
+        {
+          "id": "verification-gap",
+          "instruction": "Launch a context-free subagent with this prompt:\n\nRead `{skill-root}/review-prompts/verification-gap.md` completely and follow it as your review instructions.\n\nReview content: the unified diff at `{diff_file}`. Read that file — it is the content under review.\n\nDo not invoke any skill, and do not spawn subagents of your own — you are the reviewer. If the instruction file is unreadable, report that exact failure and stop. Return your findings as text in your final message; do not route them through any findings-reporting tool the host may offer.\n\n",
+          "name": "Verification Gap Reviewer"
+        },
+        {
+          "id": "intent-alignment",
+          "instruction": "Launch a subagent with this prompt:\n\nYou are an intent-alignment auditor. You have no other context about how this change was produced. Here is the verbatim intent this work started from:\n\n{verbatim_intent}\n\nThe diff is the unified diff at `{diff_file}`. Read that file — it is the change under review.\n\nYour task is strictly descriptive — do not prescribe additional work. Report: (1) the defensible readings of the intent, enumerated; (2) which reading this diff implements; (3) where the readings and the diff diverge — specifically, which surface the intent's expectations live at versus which surface the diff's changes and its tests exercise.\n\nDo not invoke any skill, and do not spawn subagents of your own — you are the reviewer. Return your findings as text in your final message; do not route them through any findings-reporting tool the host may offer.\n\n",
+          "name": "Intent Alignment Auditor"
+        }
+      ]
+    },
+    "source_sha256": {
+      "compile-epic-context.md": "64d13b41974cfa0dfc1de64b6fbd8365e9b99f91c7c98f0ee1a9fbd018f324ca",
+      "references/claims-check.md": "50ea17cb89a78ef815286dde2dabfd09f1dc9841d07a10857f88b39ab7b9bd2a",
+      "references/deletion-check.md": "0f1f124e4e957147e89164a272b10bedc694ad0d9ad2618c8610ac74ee9cb0da",
+      "review-prompts/edge-case-hunter.md": "8fc046af1cbf4ecc928207cec75e29c3c260adb86cc7da77537ade3b3a3b9448",
+      "review-prompts/verification-gap.md": "45ab0b8c4c56c5c055c97a293a8591a67e256d0b1a2058ce1f093cd866be8d03",
+      "spec-template.md": "59a046df2773ec05af0688823d17238bfde2bb54c0c3b3eff6acec4856f1eb7a",
+      "step-01-clarify-and-route.md": "66a017d3d374a9dc9544a0ced5221b92d2b0e12c410655a3f4ce7bf0b132e045",
+      "step-02-plan.md": "3560c0822d39337df5d1791077c40e58e6bc0d49735838fbf4ecb04f4d314efc",
+      "step-03-implement.md": "c6f533ce3f763430d28b75eea9a24ac5be3ca526218e2226a0264a5e5c3980e0",
+      "step-04-review.md": "3f2061534111af0e0e97ed037312a2abaf05cf5740a08ae3c0bf7a5bb45c0a88",
+      "workflow.md": "01be7b0ad32159afc3db8315d50f261f90510fba52eee60123938cf09c374a7d"
+    }
+  },
+  "outputs": {
+    "compile-epic-context.md": "64d13b41974cfa0dfc1de64b6fbd8365e9b99f91c7c98f0ee1a9fbd018f324ca",
+    "references/claims-check.md": "50ea17cb89a78ef815286dde2dabfd09f1dc9841d07a10857f88b39ab7b9bd2a",
+    "references/deletion-check.md": "0f1f124e4e957147e89164a272b10bedc694ad0d9ad2618c8610ac74ee9cb0da",
+    "review-prompts/edge-case-hunter.md": "8fc046af1cbf4ecc928207cec75e29c3c260adb86cc7da77537ade3b3a3b9448",
+    "review-prompts/verification-gap.md": "45ab0b8c4c56c5c055c97a293a8591a67e256d0b1a2058ce1f093cd866be8d03",
+    "spec-template.md": "59a046df2773ec05af0688823d17238bfde2bb54c0c3b3eff6acec4856f1eb7a",
+    "step-01-clarify-and-route.md": "23ff8c50741cff68c8eacdcf6cad09e307188ff0563faca7741faf07288f8d0e",
+    "step-02-plan.md": "c6955bb90030b24aaf5c90d58e006cfc6fea7cfc2fbc22533d8b49880f4c1652",
+    "step-03-implement.md": "bfc93d6605c9c69dec39944f786e9327d76d44c3abcff978dafbcb02a15201bd",
+    "step-04-review.md": "b00704ab6a88e6075ef07d0ee98808c7a45ac7a41b7f60bcbca283649dfb08c9",
+    "workflow.md": "3e24e7e5b800dca4ed9b2e8d9301880cafaf98d0dd48bda5bb8ff81c5325efc6"
+  },
+  "project_root": "D:\\Personal_Project\\financal_management",
+  "project_slug": "financal-management",
+  "root_hash": "6513de358694",
+  "schema_version": 1,
+  "skill": "bmad-build-auto"
+}

@@ -70,6 +70,38 @@ func TestListTransactions_HappyPath(t *testing.T) {
 	require.NoError(t, mock.ExpectationsWereMet())
 }
 
+// TestCreateTransaction_ValidationFailure mirrors
+// TestUpsertBudget_ValidationFailure / TestCreateCategory_ValidationFailure
+// for the create-transaction handler: invalid input is rejected before
+// touching the DB at all.
+func TestCreateTransaction_ValidationFailure(t *testing.T) {
+	h, _, closeDB := newTestHandler(t)
+	defer closeDB()
+
+	// amount <= 0 — rejected by transactionInput.validate() before any query.
+	body := `{"type":"expense","amount":0,"categoryId":"c1","date":"2026-09-12"}`
+	w, c := authedRequest("POST", "/api/transactions", body, "u1", nil)
+	h.CreateTransaction(c)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+	assert.Contains(t, w.Body.String(), `"code":40020`)
+}
+
+// TestUpdateTransaction_ValidationFailure mirrors
+// TestCreateTransaction_ValidationFailure for the update handler.
+func TestUpdateTransaction_ValidationFailure(t *testing.T) {
+	h, _, closeDB := newTestHandler(t)
+	defer closeDB()
+
+	// invalid type — rejected by transactionInput.validate() before any query.
+	body := `{"type":"bogus","amount":500,"categoryId":"c1","date":"2026-09-01"}`
+	w, c := authedRequest("PUT", "/api/transactions/t1", body, "u1", ginParams("id", "t1"))
+	h.UpdateTransaction(c)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+	assert.Contains(t, w.Body.String(), `"code":40022`)
+}
+
 // TestCreateTransaction_OwnershipFailure pins the I/O matrix's "Category
 // ownership on transaction create" scenario: User A referencing a category
 // that does not resolve under User A's id (e.g. it belongs to User B) must be
@@ -91,6 +123,27 @@ func TestCreateTransaction_OwnershipFailure(t *testing.T) {
 	// The failure envelope must carry no data, and Create must never be called
 	// — mock.ExpectationsWereMet below proves no unexpected INSERT happened
 	// (sqlmock fails the test if a query runs that wasn't expected).
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+// TestCreateTransaction_OwnershipCheckDBError: a genuine DB error while
+// checking category ownership (as opposed to sql.ErrNoRows) must surface as a
+// 500, not be mistaken for the "category not found" 400 case — mirrors
+// TestUpsertBudget_OwnershipCheckDBError for the create-transaction handler.
+func TestCreateTransaction_OwnershipCheckDBError(t *testing.T) {
+	h, mock, closeDB := newTestHandler(t)
+	defer closeDB()
+
+	mock.ExpectQuery(`SELECT 1 FROM categories WHERE id = \? AND user_id = \?`).
+		WithArgs("c1", "u1").
+		WillReturnError(sql.ErrConnDone)
+
+	body := `{"type":"expense","amount":1000,"categoryId":"c1","date":"2026-09-12"}`
+	w, c := authedRequest("POST", "/api/transactions", body, "u1", nil)
+	h.CreateTransaction(c)
+
+	assert.Equal(t, http.StatusInternalServerError, w.Code)
+	assert.Contains(t, w.Body.String(), `"code":50025`)
 	require.NoError(t, mock.ExpectationsWereMet())
 }
 
@@ -322,6 +375,25 @@ func TestCreateTransaction_ThresholdCheckFailure_RollsBack(t *testing.T) {
 	require.NoError(t, mock.ExpectationsWereMet())
 }
 
+// TestUpdateTransaction_OwnershipCheckDBError mirrors
+// TestCreateTransaction_OwnershipCheckDBError for the update handler.
+func TestUpdateTransaction_OwnershipCheckDBError(t *testing.T) {
+	h, mock, closeDB := newTestHandler(t)
+	defer closeDB()
+
+	mock.ExpectQuery(`SELECT 1 FROM categories WHERE id = \? AND user_id = \?`).
+		WithArgs("c1", "u1").
+		WillReturnError(sql.ErrConnDone)
+
+	body := `{"type":"expense","amount":500,"categoryId":"c1","date":"2026-09-01"}`
+	w, c := authedRequest("PUT", "/api/transactions/t1", body, "u1", ginParams("id", "t1"))
+	h.UpdateTransaction(c)
+
+	assert.Equal(t, http.StatusInternalServerError, w.Code)
+	assert.Contains(t, w.Body.String(), `"code":50026`)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
 func TestUpdateTransaction_NotFound(t *testing.T) {
 	h, mock, closeDB := newTestHandler(t)
 	defer closeDB()
@@ -448,6 +520,7 @@ func TestDeleteTransaction_HappyPath(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, w.Code)
 	assert.Contains(t, w.Body.String(), `"deleted":true`)
+	require.NoError(t, mock.ExpectationsWereMet())
 }
 
 // ---- helpers for create-path tests, where the transaction id is a fresh

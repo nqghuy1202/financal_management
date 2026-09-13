@@ -79,6 +79,21 @@ func (r *TransactionRepo) SumExpensesInRange(ctx context.Context, userID string,
 	return sum, err
 }
 
+// SumExpensesInCategory returns the total amount of expense-type
+// transactions for (userID, categoryID) with date in [from, to). Used by
+// GET /budgets to compute a budget's current spend (Story 2.3) — unlike
+// SumExpensesInCategoryExcluding, no row is excluded, since this runs
+// outside any write path.
+func (r *TransactionRepo) SumExpensesInCategory(ctx context.Context, userID, categoryID string, from, to time.Time) (int64, error) {
+	var sum int64
+	err := r.db.QueryRowContext(ctx,
+		`SELECT COALESCE(SUM(amount), 0) FROM transactions
+		 WHERE user_id = ? AND category_id = ? AND type = 'expense' AND date >= ? AND date < ?`,
+		userID, categoryID, from.Format(dateLayout), to.Format(dateLayout),
+	).Scan(&sum)
+	return sum, err
+}
+
 // SumExpensesInCategoryExcluding returns the total amount of expense-type
 // transactions for (userID, categoryID) with date in [from, to), excluding
 // the row identified by excludeID. Used by the budget-threshold check to

@@ -23,10 +23,20 @@ interface CycleSettingsResult {
   settings: Settings
 }
 
-// The backend has no GET for a user's settings row (only PUT /cycle-settings,
-// which returns it back) so this mirrors the DB column defaults
-// (savings_goal 0, cycle_start_day 1) until the first successful save this
-// session populates the real value.
+// Request body of POST /budgets — only the fields the caller actually
+// chooses; spent/percent/status (Story 2.3) are always server-computed, so
+// they're never part of the input, unlike the full `Budget` shape.
+interface BudgetInput {
+  id?: string
+  categoryId: string
+  limit: number
+  month: string
+}
+
+// Fallback only for the brief window before the initial /cycle/summary
+// fetch resolves (or if it fails) — GET /cycle/summary carries the real
+// savingsGoal/cycleStartDay (there is no separate GET /settings), and the
+// initial-load effect below overwrites this immediately on success.
 const DEFAULT_SETTINGS: Settings = { savingsGoal: 0, cycleStartDay: 1 }
 
 interface DataContextValue {
@@ -47,7 +57,7 @@ interface DataContextValue {
   addCategory: (c: Omit<Category, 'id'>) => Promise<void>
   deleteCategory: (id: string) => Promise<void>
 
-  upsertBudget: (b: Omit<Budget, 'id'> & { id?: string }) => Promise<void>
+  upsertBudget: (b: BudgetInput) => Promise<void>
   deleteBudget: (id: string) => Promise<void>
 
   refreshCycleSummary: () => Promise<void>
@@ -108,6 +118,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         setBudgets(buds)
         setCycleSummary(summary)
         setFixedCosts(fcs)
+        setSettings({ savingsGoal: summary.savingsGoal, cycleStartDay: summary.cycleStartDay })
       })
       .catch(() => {
         if (!cancelled) {
@@ -138,6 +149,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     try {
       const summary = await apiGet<CycleSummary>('/cycle/summary')
       setCycleSummary(summary)
+      setSettings({ savingsGoal: summary.savingsGoal, cycleStartDay: summary.cycleStartDay })
     } catch {
       // ignore — next successful load will reconcile
     }
@@ -189,7 +201,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     [refreshCycleSummary],
   )
 
-  const upsertBudget = useCallback(async (b: Omit<Budget, 'id'> & { id?: string }) => {
+  const upsertBudget = useCallback(async (b: BudgetInput) => {
     const saved = await apiSend<Budget>('POST', '/budgets', b)
     setBudgets((prev) => {
       const idx = prev.findIndex(

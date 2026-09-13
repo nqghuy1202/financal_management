@@ -143,6 +143,50 @@ func AlertStatus(threshold int) string {
 	return "near"
 }
 
+// BudgetStatus computes a budget's usage percent and 3-level status for
+// spent against limit: "within" (<70%), "near" (70-99%), "over" (>=100%).
+// Pure, no I/O — the single source of truth GET /budgets and the Dashboard
+// both call, so the two surfaces always agree on a category's status
+// (Story 2.3). A non-positive limit has no meaningful percentage; callers
+// should not invoke this for a budget without a limit (UpsertBudget already
+// rejects limit<=0 on write).
+func BudgetStatus(spent, limit int64) (percent int, status string) {
+	if limit <= 0 {
+		return 0, "within"
+	}
+	percent = int(spent * 100 / limit)
+	switch {
+	case percent >= 100:
+		status = "over"
+	case percent >= 70:
+		status = "near"
+	default:
+		status = "within"
+	}
+	return percent, status
+}
+
+// CycleWindowForMonth returns the cycle window "labeled" by month (a
+// "2006-01" calendar-month string, e.g. a budgets.month value), interpreted
+// per AD-4: the cycle that starts within that month at the CURRENT
+// cycleStartDay setting — not whatever cycleStartDay was in effect when the
+// row was created. This is what makes "budgets.month" mean the same thing
+// everywhere it's read: changing cycleStartDay reinterprets old rows
+// immediately, with nothing stored per-cycle to migrate.
+func CycleWindowForMonth(cycleStartDay int, month string) (start, end time.Time, err error) {
+	t, err := time.Parse("2006-01", month)
+	if err != nil {
+		return time.Time{}, time.Time{}, err
+	}
+	year, mon, _ := t.Date()
+	// The clamped start day within that month always lands inside the cycle
+	// that starts in that month — CycleWindow treats a day exactly on the
+	// clamped boundary as the start of the new cycle (see its doc comment).
+	asOf := time.Date(year, mon, clampDay(cycleStartDay, year, mon), 0, 0, 0, 0, t.Location())
+	start, end = CycleWindow(cycleStartDay, asOf)
+	return start, end, nil
+}
+
 // CycleInfo is one cycle's [Start, End) window.
 type CycleInfo struct {
 	Start time.Time

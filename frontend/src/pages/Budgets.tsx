@@ -13,10 +13,12 @@ import type { TransactionType } from '../types'
 const PALETTE = ['#10b981', '#0ea5e9', '#6366f1', '#8b5cf6', '#ec4899', '#f97316', '#eab308', '#ef4444', '#64748b']
 
 export function Budgets() {
-  const { budgets, transactions, categories, upsertBudget, deleteBudget, addCategory, deleteCategory } = useData()
+  const { budgets, categories, cycleSummary, upsertBudget, deleteBudget, addCategory, deleteCategory } = useData()
   const toast = useToast()
   const { t: tr, lang } = useI18n()
-  const month = currentMonth()
+  // The current cycle's month label (AD-4) — falls back to the wall-clock's
+  // calendar month only for the brief window before cycleSummary loads.
+  const month = cycleSummary?.currentMonth ?? currentMonth()
   const monthLabel = localizedMonth(month, lang)
 
   const [budgetModal, setBudgetModal] = useState(false)
@@ -34,8 +36,8 @@ export function Budgets() {
   const [cColor, setCColor] = useState(PALETTE[0])
 
   const rows = useMemo(
-    () => budgetProgress(budgets, transactions, categories, month),
-    [budgets, transactions, categories, month],
+    () => budgetProgress(budgets, categories, month),
+    [budgets, categories, month],
   )
 
   const totalLimit = rows.reduce((s, r) => s + r.budget.limit, 0)
@@ -148,8 +150,8 @@ export function Budgets() {
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {rows.map((r) => {
-            const over = r.percent > 100
-            const near = r.percent >= 80 && r.percent <= 100
+            const over = r.status === 'over'
+            const near = r.status === 'near'
             return (
               <div key={r.budget.id} className="card group p-5">
                 <div className="flex items-start justify-between">

@@ -8,6 +8,7 @@ package api
 import (
 	"context"
 	"database/sql"
+	"log"
 
 	"github.com/gin-gonic/gin"
 )
@@ -61,12 +62,16 @@ func (h *Handler) withTx(ctx context.Context, fn func(tx *sql.Tx) error) error {
 	}
 	defer func() {
 		if p := recover(); p != nil {
-			tx.Rollback()
+			if rbErr := tx.Rollback(); rbErr != nil {
+				log.Printf("withTx: rollback after panic failed: %v", rbErr)
+			}
 			panic(p)
 		}
 	}()
 	if err := fn(tx); err != nil {
-		tx.Rollback()
+		if rbErr := tx.Rollback(); rbErr != nil {
+			log.Printf("withTx: rollback after error failed: %v", rbErr)
+		}
 		return err
 	}
 	return tx.Commit()
@@ -97,11 +102,18 @@ type Transaction struct {
 	Date       string `json:"date"` // yyyy-mm-dd
 }
 
+// Budget's Spent/Percent/Status are computed fresh on every GET /budgets and
+// POST /budgets response (Story 2.3, via attachBudgetStatus) — never
+// stored — so the Budgets page and Dashboard, which both read this same
+// field set, can never disagree.
 type Budget struct {
 	ID         string `json:"id"`
 	CategoryID string `json:"categoryId"`
 	Limit      int64  `json:"limit"`
 	Month      string `json:"month"` // yyyy-mm
+	Spent      int64  `json:"spent"`
+	Percent    int    `json:"percent"`
+	Status     string `json:"status"` // within | near | over
 }
 
 // Income is a user's declared income for one budget cycle.
@@ -137,7 +149,10 @@ type CycleSettingsResult struct {
 // (architecture spans FR-1/FR-6/FR-7 for this contract). FR-1 (Story 1.5)
 // computes SafeToSpend/DaysRemaining/Income/PreviousIncome; FR-6 (Story 2.2)
 // populates ActiveAlerts with real data. Budgets ships empty until Story 2.3
-// populates it, without a contract change.
+// populates it, without a contract change. SavingsGoal/CycleStartDay were
+// folded in later (no separate GET /settings exists) so the frontend can
+// read the user's real saved settings instead of defaulting to the DB
+// column defaults on every fresh session — see deferred-work.md.
 type CycleSummary struct {
 	SafeToSpend    int64         `json:"safeToSpend"`
 	DaysRemaining  int           `json:"daysRemaining"`
@@ -145,6 +160,14 @@ type CycleSummary struct {
 	PreviousIncome *int64        `json:"previousIncome"`
 	Budgets        []any         `json:"budgets"`
 	ActiveAlerts   []ActiveAlert `json:"activeAlerts"`
+	SavingsGoal    int64         `json:"savingsGoal"`
+	CycleStartDay  int           `json:"cycleStartDay"`
+	// CurrentMonth is cycleStart's calendar month ("2006-01"), i.e. the
+	// budgets.month value that identifies the current cycle (AD-4, Story
+	// 2.3) — the frontend uses this instead of the wall-clock's own calendar
+	// month, so a cycleStartDay other than 1 doesn't mismatch which budgets
+	// are "current."
+	CurrentMonth string `json:"currentMonth"`
 }
 
 // ---- response helpers ----

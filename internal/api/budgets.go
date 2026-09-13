@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"net/http"
 	"regexp"
 
@@ -16,12 +17,48 @@ type budgetInput struct {
 }
 
 func (h *Handler) ListBudgets(c *gin.Context) {
-	list, err := h.budgets.List(c.Request.Context(), userIDFrom(c))
+	ctx := c.Request.Context()
+	uid := userIDFrom(c)
+
+	list, err := h.budgets.List(ctx, uid)
 	if err != nil {
 		fail(c, http.StatusInternalServerError, 50030, "Không thể tải ngân sách")
 		return
 	}
+
+	settings, err := h.settings.Get(ctx, uid)
+	if err != nil {
+		fail(c, http.StatusInternalServerError, 50035, "Không thể tải ngân sách")
+		return
+	}
+	for i := range list {
+		if err := h.attachBudgetStatus(ctx, uid, settings.CycleStartDay, &list[i]); err != nil {
+			fail(c, http.StatusInternalServerError, 50036, "Không thể tải ngân sách")
+			return
+		}
+	}
 	ok(c, list)
+}
+
+// attachBudgetStatus fills in b.Spent/Percent/Status (Story 2.3), computed
+// from b.Month reinterpreted per the current cycleStartDay
+// (CycleWindowForMonth) — the single path ListBudgets and UpsertBudget both
+// call, so a budget's status is never computed two different ways.
+func (h *Handler) attachBudgetStatus(ctx context.Context, userID string, cycleStartDay int, b *Budget) error {
+	start, end, err := CycleWindowForMonth(cycleStartDay, b.Month)
+	if err != nil {
+		// Malformed month (shouldn't happen; monthRe validates on write) —
+		// leave spent/percent/status at their zero values rather than fail
+		// the whole list over one bad row.
+		return nil
+	}
+	spent, err := h.transactions.SumExpensesInCategory(ctx, userID, b.CategoryID, start, end)
+	if err != nil {
+		return err
+	}
+	b.Spent = spent
+	b.Percent, b.Status = BudgetStatus(spent, b.Limit)
+	return nil
 }
 
 // UpsertBudget sets the limit for a (category, month); it inserts or updates the
@@ -52,6 +89,16 @@ func (h *Handler) UpsertBudget(c *gin.Context) {
 	b, err := h.budgets.Upsert(ctx, uid, Budget{CategoryID: in.CategoryID, Limit: in.Limit, Month: in.Month})
 	if err != nil {
 		fail(c, http.StatusInternalServerError, 50032, "Không thể lưu ngân sách")
+		return
+	}
+
+	settings, err := h.settings.Get(ctx, uid)
+	if err != nil {
+		fail(c, http.StatusInternalServerError, 50035, "Không thể tải ngân sách")
+		return
+	}
+	if err := h.attachBudgetStatus(ctx, uid, settings.CycleStartDay, &b); err != nil {
+		fail(c, http.StatusInternalServerError, 50036, "Không thể tải ngân sách")
 		return
 	}
 	ok(c, b)
