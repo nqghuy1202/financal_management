@@ -40,5 +40,6 @@ func (h *Handler) Register(rg *gin.RouterGroup) {
 
 		auth.PUT("/cycle-settings", h.UpdateCycleSettings)
 		auth.GET("/cycle/summary", h.GetCycleSummary)
+		auth.POST("/alerts/:categoryId/:threshold/dismiss", h.DismissAlert)
 	}
 }

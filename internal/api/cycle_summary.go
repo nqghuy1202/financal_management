@@ -68,13 +68,19 @@ func (h *Handler) GetCycleSummary(c *gin.Context) {
 	}
 	safeToSpend := SafeToSpend(incomeForCalc, fixedTotal, settings.SavingsGoal, spent, daysRemaining)
 
+	alerts, err := NewAlertStateRepo(h.db).ListActive(ctx, userID, cycleStart)
+	if err != nil {
+		fail(c, http.StatusInternalServerError, 50085, "Không thể tải cảnh báo")
+		return
+	}
+
 	ok(c, CycleSummary{
 		SafeToSpend:    safeToSpend,
 		DaysRemaining:  daysRemaining,
 		Income:         incomePtr,
 		PreviousIncome: previousIncomePtr,
 		Budgets:        []any{},
-		ActiveAlerts:   []any{},
+		ActiveAlerts:   alerts,
 	})
 }
 

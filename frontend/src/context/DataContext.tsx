@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import type {
+  ActiveAlert,
   Budget,
   Category,
   CycleSettingsInput,
@@ -9,10 +10,11 @@ import type {
   Settings,
   Transaction,
 } from '../types'
-import { apiGet, apiSend } from '../lib/api'
+import { apiGet, apiSend, ApiError } from '../lib/api'
 import { localizedCategory } from '../lib/i18n'
 import { useAuth } from './AuthContext'
 import { useI18n } from './I18nContext'
+import { useToast } from './ToastContext'
 
 // Response shape of PUT /cycle-settings: the canonical income row for the
 // (newly computed) current cycle, plus the canonical settings row.
@@ -49,6 +51,7 @@ interface DataContextValue {
   deleteBudget: (id: string) => Promise<void>
 
   refreshCycleSummary: () => Promise<void>
+  dismissAlert: (categoryId: string, threshold: ActiveAlert['threshold']) => Promise<void>
   saveCycleSettings: (input: CycleSettingsInput) => Promise<void>
   addFixedCost: (fc: Omit<FixedCost, 'id'>) => Promise<void>
   updateFixedCost: (fc: FixedCost) => Promise<void>
@@ -60,6 +63,7 @@ const DataContext = createContext<DataContextValue | null>(null)
 export function DataProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth()
   const { lang } = useI18n()
+  const toast = useToast()
   const [rawCategories, setRawCategories] = useState<Category[]>([])
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [budgets, setBudgets] = useState<Budget[]>([])
@@ -171,12 +175,19 @@ export function DataProvider({ children }: { children: ReactNode }) {
     setRawCategories((prev) => [...prev, created])
   }, [])
 
-  const deleteCategory = useCallback(async (id: string) => {
-    await apiSend('DELETE', `/categories/${id}`)
-    // Server cascades related budgets; mirror that locally.
-    setRawCategories((prev) => prev.filter((c) => c.id !== id))
-    setBudgets((prev) => prev.filter((b) => b.categoryId !== id))
-  }, [])
+  const deleteCategory = useCallback(
+    async (id: string) => {
+      await apiSend('DELETE', `/categories/${id}`)
+      // Server cascades related budgets; mirror that locally.
+      setRawCategories((prev) => prev.filter((c) => c.id !== id))
+      setBudgets((prev) => prev.filter((b) => b.categoryId !== id))
+      // Server also cascades budget_alert_state rows for this category;
+      // refresh so a stale activeAlerts entry never lingers until some
+      // unrelated later refresh happens to drop it.
+      refreshCycleSummary()
+    },
+    [refreshCycleSummary],
+  )
 
   const upsertBudget = useCallback(async (b: Omit<Budget, 'id'> & { id?: string }) => {
     const saved = await apiSend<Budget>('POST', '/budgets', b)
@@ -206,6 +217,36 @@ export function DataProvider({ children }: { children: ReactNode }) {
     },
     [refreshCycleSummary],
   )
+
+  // Dismiss one (categoryId, threshold) alert. Waits for the server to
+  // confirm before removing the banner (never optimistic) so a failed
+  // request leaves the banner in place for the user to retry — except a 400
+  // (category no longer owned/found, i.e. deleted since the page loaded),
+  // which self-heals by dropping it locally right away instead of leaving a
+  // permanently stuck banner.
+  const dismissAlert = useCallback(async (categoryId: string, threshold: ActiveAlert['threshold']) => {
+    const drop = () =>
+      setCycleSummary((prev) =>
+        prev
+          ? {
+              ...prev,
+              activeAlerts: prev.activeAlerts.filter(
+                (a) => !(a.categoryId === categoryId && a.threshold === threshold),
+              ),
+            }
+          : prev,
+      )
+    try {
+      await apiSend('POST', `/alerts/${categoryId}/${threshold}/dismiss`)
+      drop()
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 400) {
+        drop()
+        return
+      }
+      toast.error(e instanceof Error ? e.message : String(e))
+    }
+  }, [toast])
 
   const addFixedCost = useCallback(
     async (fc: Omit<FixedCost, 'id'>) => {
@@ -256,6 +297,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       upsertBudget,
       deleteBudget,
       refreshCycleSummary,
+      dismissAlert,
       saveCycleSettings,
       addFixedCost,
       updateFixedCost,
@@ -279,6 +321,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       upsertBudget,
       deleteBudget,
       refreshCycleSummary,
+      dismissAlert,
       saveCycleSettings,
       addFixedCost,
       updateFixedCost,

@@ -156,6 +156,14 @@ const vi: Dict = {
   'sth.retry': 'Thử lại',
   'sth.overspentHint': 'Bạn đã chi vượt mức cho phép trong chu kỳ này.',
 
+  // alert banners (Story 2.2)
+  'alert.near': '{category} đã dùng gần hết ngân sách. Còn {days} ngày trong chu kỳ này.',
+  'alert.over': '{category} đã vượt ngân sách. Còn {days} ngày trong chu kỳ này.',
+  'alert.dismissAria': 'Đóng cảnh báo cho {category}',
+  'alert.moreCount': '+{count} cảnh báo khác',
+  'alert.moreCountOne': '+{count} cảnh báo khác',
+  'alert.unknownCategory': 'Danh mục đã xóa',
+
   // cycle update sheet
   'cus.title': 'Cập nhật chu kỳ',
   'cus.income': 'Lương',
@@ -340,6 +348,14 @@ const en: Dict = {
   'sth.loadError': "Couldn't load Safe-to-spend. Please try again.",
   'sth.retry': 'Retry',
   'sth.overspentHint': "You've gone over budget for this cycle.",
+
+  // alert banners (Story 2.2)
+  'alert.near': '{category} has almost used up its budget. {days} days left in this cycle.',
+  'alert.over': '{category} has gone over budget. {days} days left in this cycle.',
+  'alert.dismissAria': 'Dismiss alert for {category}',
+  'alert.moreCount': '+{count} more alerts',
+  'alert.moreCountOne': '+{count} more alert',
+  'alert.unknownCategory': 'Deleted category',
 
   // cycle update sheet
   'cus.title': 'Update cycle',

@@ -92,6 +92,22 @@ func expectSumExpensesError(mock sqlmock.Sqlmock, userID, from, to string, err e
 		WillReturnError(err)
 }
 
+func expectListActiveAlerts(mock sqlmock.Sqlmock, userID, cycleStr string, rows ...[2]interface{}) {
+	rs := sqlmock.NewRows([]string{"category_id", "threshold"})
+	for _, r := range rows {
+		rs.AddRow(r[0], r[1])
+	}
+	mock.ExpectQuery(`SELECT category_id, threshold FROM budget_alert_state\s+WHERE user_id = \? AND cycle_start_date = \? AND dismissed_at IS NULL\s+ORDER BY threshold DESC, triggered_at DESC`).
+		WithArgs(userID, cycleStr).
+		WillReturnRows(rs)
+}
+
+func expectListActiveAlertsError(mock sqlmock.Sqlmock, userID, cycleStr string, err error) {
+	mock.ExpectQuery(`SELECT category_id, threshold FROM budget_alert_state\s+WHERE user_id = \? AND cycle_start_date = \? AND dismissed_at IS NULL\s+ORDER BY threshold DESC, triggered_at DESC`).
+		WithArgs(userID, cycleStr).
+		WillReturnError(err)
+}
+
 // TestGetCycleSummary_FullInputsDeclared pins the I/O matrix's main
 // scenario: income, fixed costs and savings goal all declared, with some
 // expenses already saved this cycle.
@@ -109,6 +125,10 @@ func TestGetCycleSummary_FullInputsDeclared(t *testing.T) {
 	expectIncomeGet(mock, "u1", prevStr, 14000000)
 	expectFixedCostsList(mock, "u1", 3000000, 2000000)
 	expectSumExpenses(mock, "u1", cycleStr, endStr, 1000000)
+	expectListActiveAlerts(mock, "u1", cycleStr,
+		[2]interface{}{"cat-over", 100},
+		[2]interface{}{"cat-near", 70},
+	)
 
 	w, c := authedRequest("GET", "/api/cycle/summary", "", "u1", nil)
 	h.GetCycleSummary(c)
@@ -121,7 +141,7 @@ func TestGetCycleSummary_FullInputsDeclared(t *testing.T) {
 	assert.Contains(t, body, `"income":15000000`)
 	assert.Contains(t, body, `"previousIncome":14000000`)
 	assert.Contains(t, body, `"budgets":[]`)
-	assert.Contains(t, body, `"activeAlerts":[]`)
+	assert.Contains(t, body, `"activeAlerts":[{"categoryId":"cat-over","threshold":100,"status":"over"},{"categoryId":"cat-near","threshold":70,"status":"near"}]`)
 	require.NoError(t, mock.ExpectationsWereMet())
 }
 
@@ -143,6 +163,7 @@ func TestGetCycleSummary_IncomeNotDeclared(t *testing.T) {
 	expectIncomeGet(mock, "u1", prevStr, 14000000)
 	expectFixedCostsList(mock, "u1", 5000000)
 	expectSumExpenses(mock, "u1", cycleStr, endStr, 0)
+	expectListActiveAlerts(mock, "u1", cycleStr)
 
 	w, c := authedRequest("GET", "/api/cycle/summary", "", "u1", nil)
 	h.GetCycleSummary(c)
@@ -153,6 +174,7 @@ func TestGetCycleSummary_IncomeNotDeclared(t *testing.T) {
 	assert.Contains(t, body, fmt.Sprintf(`"safeToSpend":%d`, expected))
 	assert.Contains(t, body, `"income":null`)
 	assert.Contains(t, body, `"previousIncome":14000000`)
+	assert.Contains(t, body, `"activeAlerts":[]`)
 	require.NoError(t, mock.ExpectationsWereMet())
 }
 
@@ -174,6 +196,7 @@ func TestGetCycleSummary_NoFixedCostsOrSavingsGoal(t *testing.T) {
 	expectIncomeGetNotFound(mock, "u1", prevStr)
 	expectFixedCostsList(mock, "u1")
 	expectSumExpenses(mock, "u1", cycleStr, endStr, 0)
+	expectListActiveAlerts(mock, "u1", cycleStr)
 
 	w, c := authedRequest("GET", "/api/cycle/summary", "", "u1", nil)
 	h.GetCycleSummary(c)
@@ -183,6 +206,7 @@ func TestGetCycleSummary_NoFixedCostsOrSavingsGoal(t *testing.T) {
 	assert.Contains(t, body, `"safeToSpend":0`)
 	assert.Contains(t, body, `"income":null`)
 	assert.Contains(t, body, `"previousIncome":null`)
+	assert.Contains(t, body, `"activeAlerts":[]`)
 	require.NoError(t, mock.ExpectationsWereMet())
 }
 
@@ -203,6 +227,7 @@ func TestGetCycleSummary_Overspent_NegativeSafeToSpend(t *testing.T) {
 	expectIncomeGet(mock, "u1", prevStr, 5000000)
 	expectFixedCostsList(mock, "u1", 3000000)
 	expectSumExpenses(mock, "u1", cycleStr, endStr, 4000000)
+	expectListActiveAlerts(mock, "u1", cycleStr)
 
 	w, c := authedRequest("GET", "/api/cycle/summary", "", "u1", nil)
 	h.GetCycleSummary(c)
@@ -233,6 +258,7 @@ func TestGetCycleSummary_PreviousIncomeNotDeclared(t *testing.T) {
 	expectIncomeGetNotFound(mock, "u1", prevStr)
 	expectFixedCostsList(mock, "u1")
 	expectSumExpenses(mock, "u1", cycleStr, endStr, 0)
+	expectListActiveAlerts(mock, "u1", cycleStr)
 
 	w, c := authedRequest("GET", "/api/cycle/summary", "", "u1", nil)
 	h.GetCycleSummary(c)
@@ -327,5 +353,32 @@ func TestGetCycleSummary_SumExpensesError_Returns500(t *testing.T) {
 
 	assert.Equal(t, http.StatusInternalServerError, w.Code)
 	assert.Contains(t, w.Body.String(), `"code":50084`)
+	require.NoError(t, mock.ExpectationsWereMet())
+}
+
+// TestGetCycleSummary_ActiveAlertsError_Returns500 pins that a genuine
+// ListActive error (distinct from an empty result) surfaces as its own 500
+// code rather than crashing or silently dropping alerts.
+func TestGetCycleSummary_ActiveAlertsError_Returns500(t *testing.T) {
+	h, mock, closeDB := newTestHandler(t)
+	defer closeDB()
+
+	fx := newCycleSummaryFixture(1)
+	cycleStr := fx.cycleStart.Format(dateLayout)
+	prevStr := fx.prevStart.Format(dateLayout)
+	endStr := fx.cycleEnd.Format(dateLayout)
+
+	expectSettingsGet(mock, "u1", 0, 1)
+	expectIncomeGetNotFound(mock, "u1", cycleStr)
+	expectIncomeGetNotFound(mock, "u1", prevStr)
+	expectFixedCostsList(mock, "u1")
+	expectSumExpenses(mock, "u1", cycleStr, endStr, 0)
+	expectListActiveAlertsError(mock, "u1", cycleStr, sql.ErrConnDone)
+
+	w, c := authedRequest("GET", "/api/cycle/summary", "", "u1", nil)
+	h.GetCycleSummary(c)
+
+	assert.Equal(t, http.StatusInternalServerError, w.Code)
+	assert.Contains(t, w.Body.String(), `"code":50085`)
 	require.NoError(t, mock.ExpectationsWereMet())
 }

@@ -246,3 +246,20 @@ func TestCrossedThreshold_StaysBelowAllThresholds(t *testing.T) {
 	assert.False(t, crossed)
 	assert.Equal(t, 0, threshold)
 }
+
+// TestAlertStatus_100IsOver pins that only the 100 threshold maps to "over".
+func TestAlertStatus_100IsOver(t *testing.T) {
+	assert.Equal(t, "over", AlertStatus(100))
+}
+
+// TestAlertStatus_BelowHundredIsNear pins that both 70 and 90 map to "near".
+func TestAlertStatus_BelowHundredIsNear(t *testing.T) {
+	assert.Equal(t, "near", AlertStatus(70))
+	assert.Equal(t, "near", AlertStatus(90))
+}
+
+// TestAlertStatus_AboveHundredIsOver pins that any threshold at or above 100
+// (not just exactly 100) is treated as "over", matching the >= comparison.
+func TestAlertStatus_AboveHundredIsOver(t *testing.T) {
+	assert.Equal(t, "over", AlertStatus(150))
+}

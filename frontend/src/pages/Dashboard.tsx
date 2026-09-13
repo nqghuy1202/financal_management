@@ -24,13 +24,18 @@ import { useI18n } from '../context/I18nContext'
 import { StatCard } from '../components/StatCard'
 import { CategoryIcon } from '../components/CategoryIcon'
 import { SafeToSpendHero } from '../components/SafeToSpendHero'
+import { AlertBanner } from '../components/AlertBanner'
 import { budgetProgress, expenseBreakdown, filterByMonth, monthlyTrend, sumByType } from '../lib/analytics'
 import { currentMonth, formatCompact, formatCurrency, formatDate } from '../lib/format'
 
 export function Dashboard() {
-  const { transactions, categories, budgets, categoryById } = useData()
+  const { transactions, categories, budgets, categoryById, cycleSummary } = useData()
   const { t: tr } = useI18n()
   const month = currentMonth()
+
+  const activeAlerts = cycleSummary?.activeAlerts ?? []
+  const visibleAlerts = activeAlerts.slice(0, 3)
+  const overflowCount = activeAlerts.length - visibleAlerts.length
 
   const monthTxs = useMemo(() => filterByMonth(transactions, month), [transactions, month])
   const income = useMemo(() => sumByType(monthTxs, 'income'), [monthTxs])
@@ -49,6 +54,24 @@ export function Dashboard() {
   return (
     <div className="space-y-6">
       <SafeToSpendHero />
+
+      {visibleAlerts.length > 0 && (
+        <div className="space-y-2">
+          {visibleAlerts.map((alert) => (
+            <AlertBanner key={`${alert.categoryId}-${alert.threshold}`} alert={alert} />
+          ))}
+          {overflowCount > 0 && (
+            <Link
+              to="/budgets"
+              className="block text-sm font-medium text-brand-700 hover:text-brand-800"
+            >
+              {tr(overflowCount === 1 ? 'alert.moreCountOne' : 'alert.moreCount', {
+                count: overflowCount,
+              })}
+            </Link>
+          )}
+        </div>
+      )}
 
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>

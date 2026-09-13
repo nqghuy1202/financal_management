@@ -132,6 +132,17 @@ func CrossedThreshold(prevSpent, newSpent, limit int64) (threshold int, crossed 
 	return 0, false
 }
 
+// AlertStatus maps a crossed threshold (70, 90, 100) to its display status:
+// "over" for 100, "near" for anything below. Pure, no I/O — lives next to
+// CrossedThreshold so Story 2.3 can import/call this exact mapping for
+// GET /budgets's per-category status instead of re-deriving it.
+func AlertStatus(threshold int) string {
+	if threshold >= 100 {
+		return "over"
+	}
+	return "near"
+}
+
 // CycleInfo is one cycle's [Start, End) window.
 type CycleInfo struct {
 	Start time.Time

@@ -134,17 +134,17 @@ type CycleSettingsResult struct {
 }
 
 // CycleSummary is the fixed-shape response for GET /cycle/summary
-// (architecture spans FR-1/FR-6/FR-7 for this contract). Only FR-1 — this
-// story — computes real data: SafeToSpend/DaysRemaining/Income/
-// PreviousIncome. Budgets/ActiveAlerts ship empty until Epic 2 populates
-// them, without a contract change.
+// (architecture spans FR-1/FR-6/FR-7 for this contract). FR-1 (Story 1.5)
+// computes SafeToSpend/DaysRemaining/Income/PreviousIncome; FR-6 (Story 2.2)
+// populates ActiveAlerts with real data. Budgets ships empty until Story 2.3
+// populates it, without a contract change.
 type CycleSummary struct {
-	SafeToSpend    int64  `json:"safeToSpend"`
-	DaysRemaining  int    `json:"daysRemaining"`
-	Income         *int64 `json:"income"`
-	PreviousIncome *int64 `json:"previousIncome"`
-	Budgets        []any  `json:"budgets"`
-	ActiveAlerts   []any  `json:"activeAlerts"`
+	SafeToSpend    int64         `json:"safeToSpend"`
+	DaysRemaining  int           `json:"daysRemaining"`
+	Income         *int64        `json:"income"`
+	PreviousIncome *int64        `json:"previousIncome"`
+	Budgets        []any         `json:"budgets"`
+	ActiveAlerts   []ActiveAlert `json:"activeAlerts"`
 }
 
 // ---- response helpers ----

@@ -51,11 +51,19 @@ export interface Settings {
   cycleStartDay: number
 }
 
-// Placeholder shapes for the always-empty arrays GET /cycle/summary ships
-// today (budgets[].status / activeAlerts[] are Epic 2's job) — nothing
-// concrete to type yet, matching the backend's `[]any{}`.
+// Placeholder shape for the always-empty `budgets` array GET /cycle/summary
+// ships today (budgets[].status is Story 2.3's job) — nothing concrete to
+// type yet, matching the backend's `[]any{}`.
 export type BudgetStatus = Record<string, unknown>
-export type ActiveAlert = Record<string, unknown>
+
+// One undismissed budget-threshold alert (Story 2.2). Fixed contract from
+// the architecture: no percent/spent figure, just enough to render banner
+// copy — the frontend resolves categoryId -> display name locally.
+export interface ActiveAlert {
+  categoryId: string
+  threshold: 70 | 90 | 100
+  status: 'near' | 'over'
+}
 
 // Response shape of GET /cycle/summary.
 export interface CycleSummary {
