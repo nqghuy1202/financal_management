@@ -20,6 +20,15 @@ tmp/
 
 .claude/
 
+# BMAD tooling (skills, scripts, generated artifacts) — not project code
+.agents/
+_bmad/
+_bmad-output/
+skills-lock.json
+
+# Internal technical doc, not meant for the public repo
+TAI_LIEU_KY_THUAT.docx
+
 # .env file
 .env
 

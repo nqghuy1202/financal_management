@@ -1,8 +1,6 @@
 package api
 
 import (
-	"bytes"
-	"log"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -71,59 +69,23 @@ func TestLoadConfig_CORSOriginsCommaSplit(t *testing.T) {
 	assert.Equal(t, []string{"https://a.com", "https://b.com", "https://c.com"}, cfg.CORSOrigins)
 }
 
-// captureLog redirects the standard logger's output for the duration of fn
-// and returns what was written.
-func captureLog(t *testing.T, fn func()) string {
-	t.Helper()
-	var buf bytes.Buffer
-	prev := log.Writer()
-	log.SetOutput(&buf)
-	defer log.SetOutput(prev)
-	fn()
-	return buf.String()
-}
-
-func TestLoadConfig_JWTSecret(t *testing.T) {
-	t.Run("empty secret is substituted with a default and warns", func(t *testing.T) {
-		clearConfigEnv(t)
-
-		var cfg Config
-		out := captureLog(t, func() { cfg = LoadConfig() })
-
-		assert.Equal(t, []byte("dev-secret-change-me"), cfg.JWTSecret)
-		assert.Contains(t, out, "WARNING")
+// TestValidateJWTSecret covers the fail-fast rule LoadConfig applies via
+// log.Fatalf (not exercised directly here — os.Exit would kill the test
+// binary — so this pins the pure decision function instead).
+func TestValidateJWTSecret(t *testing.T) {
+	t.Run("empty secret is rejected", func(t *testing.T) {
+		assert.Error(t, validateJWTSecret(""))
 	})
 
-	t.Run("weak secret warns but keeps the literal value", func(t *testing.T) {
-		clearConfigEnv(t)
-		t.Setenv("JWT_SECRET", "my-dev-secret-value")
-
-		var cfg Config
-		out := captureLog(t, func() { cfg = LoadConfig() })
-
-		assert.Equal(t, []byte("my-dev-secret-value"), cfg.JWTSecret)
-		assert.Contains(t, out, "WARNING")
+	t.Run("dev-secret variant is rejected", func(t *testing.T) {
+		assert.Error(t, validateJWTSecret("my-dev-secret-value"))
 	})
 
-	t.Run("another weak variant (change-me) also warns", func(t *testing.T) {
-		clearConfigEnv(t)
-		t.Setenv("JWT_SECRET", "please-change-me-in-prod")
-
-		var cfg Config
-		out := captureLog(t, func() { cfg = LoadConfig() })
-
-		assert.Equal(t, []byte("please-change-me-in-prod"), cfg.JWTSecret)
-		assert.Contains(t, out, "WARNING")
+	t.Run("change-me variant is rejected", func(t *testing.T) {
+		assert.Error(t, validateJWTSecret("please-change-me-in-prod"))
 	})
 
-	t.Run("strong secret produces no warning and is used as-is", func(t *testing.T) {
-		clearConfigEnv(t)
-		t.Setenv("JWT_SECRET", "a-genuinely-strong-random-secret")
-
-		var cfg Config
-		out := captureLog(t, func() { cfg = LoadConfig() })
-
-		assert.Equal(t, []byte("a-genuinely-strong-random-secret"), cfg.JWTSecret)
-		assert.Empty(t, out)
+	t.Run("strong secret is accepted", func(t *testing.T) {
+		assert.NoError(t, validateJWTSecret("a-genuinely-strong-random-secret"))
 	})
 }

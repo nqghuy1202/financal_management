@@ -1,6 +1,7 @@
 package api
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"strings"
@@ -34,15 +35,30 @@ func envOr(key, fallback string) string {
 	return fallback
 }
 
+// validateJWTSecret rejects an empty secret or one still carrying a known
+// placeholder marker ("dev-secret"/"change-me", e.g. .env.example's own
+// default). This used to be a warn-and-substitute-a-fallback situation, but
+// the source is public: anyone can read this exact fallback value and the
+// token claim shape, so a deployment that never set a real secret would let
+// anyone forge a valid JWT for any user_id. Refusing to start is the only
+// safe response — a loud boot failure beats a silent hole.
+func validateJWTSecret(secret string) error {
+	if secret == "" {
+		return fmt.Errorf("JWT_SECRET chưa được đặt")
+	}
+	if strings.Contains(secret, "dev-secret") || strings.Contains(secret, "change-me") {
+		return fmt.Errorf("JWT_SECRET còn dùng giá trị mẫu (%q) — phải đổi sang một chuỗi bí mật thật", secret)
+	}
+	return nil
+}
+
 // LoadConfig reads all runtime configuration from the environment. Call it
-// once at startup (see cmd/web/main.go).
+// once at startup (see cmd/web/main.go). Exits the process via log.Fatalf if
+// JWT_SECRET is missing or still a placeholder — see validateJWTSecret.
 func LoadConfig() Config {
 	secret := os.Getenv("JWT_SECRET")
-	if secret == "" || strings.Contains(secret, "dev-secret") || strings.Contains(secret, "change-me") {
-		log.Println("WARNING: JWT_SECRET yếu/mặc định - ĐẶT một chuỗi bí mật mạnh cho production!")
-		if secret == "" {
-			secret = "dev-secret-change-me"
-		}
+	if err := validateJWTSecret(secret); err != nil {
+		log.Fatalf("%v. Đặt một chuỗi ngẫu nhiên mạnh, ví dụ: openssl rand -hex 32", err)
 	}
 
 	return Config{

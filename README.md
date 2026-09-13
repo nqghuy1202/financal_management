@@ -87,7 +87,7 @@ cd frontend && npm run dev # frontend :5173 (proxies /api → :8080)
 | `PORT` | `8080` | Port the server listens on |
 | `STATIC_DIR` | `./frontend/dist` | Built frontend directory |
 | `CORS_ORIGINS` | `http://localhost:5173` | Allowed origins (comma-separated) |
-| `JWT_SECRET` | — | Secret for signing JWTs (**set a strong value in prod**) |
+| `JWT_SECRET` | — | Secret for signing JWTs. **Required, no fallback** — the server refuses to start if this is empty or still a placeholder (`change-me`/`dev-secret`), even locally. Generate one with `openssl rand -hex 32`. |
 | `BLUEPRINT_DB_HOST/PORT/DATABASE/USERNAME/PASSWORD` | — | MySQL connection |
 
 The schema is created automatically on boot (`CREATE TABLE IF NOT EXISTS`).
