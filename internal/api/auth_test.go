@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"net/http"
 	"testing"
+	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/stretchr/testify/assert"
@@ -157,8 +158,9 @@ func TestMe(t *testing.T) {
 
 // TestDemo_Seeding pins the withTx orchestration path in Demo: a demo user is
 // created, seeded with the standard default categories, then populated with
-// sample transactions and budgets — all inside a single transaction that
-// commits once, atomically.
+// a 6-month transaction history, settings/fixed-costs/income, budgets, and
+// whatever budget-threshold alerts that seeded spend actually crosses — all
+// inside a single transaction that commits once, atomically.
 func TestDemo_Seeding(t *testing.T) {
 	h, mock, closeDB := newTestHandler(t)
 	defer closeDB()
@@ -166,7 +168,7 @@ func TestDemo_Seeding(t *testing.T) {
 	mock.ExpectBegin()
 
 	mock.ExpectExec(`INSERT INTO users \(id, name, email, password_hash\) VALUES \(\?, \?, \?, \?\)`).
-		WithArgs(sqlmock.AnyArg(), "Demo", sqlmock.AnyArg(), sqlmock.AnyArg()).
+		WithArgs(sqlmock.AnyArg(), "Minh Nguyễn", sqlmock.AnyArg(), sqlmock.AnyArg()).
 		WillReturnResult(sqlmock.NewResult(1, 1))
 
 	seededNames := make([]string, 0, len(defaultCategories))
@@ -191,7 +193,41 @@ func TestDemo_Seeding(t *testing.T) {
 			WillReturnResult(sqlmock.NewResult(1, 1))
 	}
 
-	for i := 0; i < len(sampleBudgets); i++ {
+	mock.ExpectExec(`INSERT INTO user_settings \(user_id, savings_goal, cycle_start_day\)\s+VALUES \(\?, \?, \?\)\s+ON DUPLICATE KEY UPDATE savings_goal = VALUES\(savings_goal\), cycle_start_day = VALUES\(cycle_start_day\)`).
+		WithArgs(sqlmock.AnyArg(), demoSavingsGoal, demoCycleStartDay).
+		WillReturnResult(sqlmock.NewResult(1, 1))
+	mock.ExpectQuery(`SELECT savings_goal, cycle_start_day FROM user_settings WHERE user_id = \?`).
+		WithArgs(sqlmock.AnyArg()).
+		WillReturnRows(sqlmock.NewRows([]string{"savings_goal", "cycle_start_day"}).AddRow(demoSavingsGoal, demoCycleStartDay))
+
+	for i := 0; i < len(demoFixedCosts); i++ {
+		mock.ExpectExec(`INSERT INTO fixed_costs \(id, user_id, name, amount\) VALUES \(\?, \?, \?, \?\)`).
+			WithArgs(sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg()).
+			WillReturnResult(sqlmock.NewResult(1, 1))
+	}
+
+	// Income declared for the current cycle, then the one before it.
+	for i := 0; i < 2; i++ {
+		mock.ExpectExec(`INSERT INTO incomes \(id, user_id, cycle_start_date, amount\)\s+VALUES \(\?, \?, \?, \?\)\s+ON DUPLICATE KEY UPDATE amount = VALUES\(amount\)`).
+			WithArgs(sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg()).
+			WillReturnResult(sqlmock.NewResult(1, 1))
+		mock.ExpectQuery(`SELECT id, cycle_start_date, amount FROM incomes\s+WHERE user_id = \? AND cycle_start_date = \?`).
+			WithArgs(sqlmock.AnyArg(), sqlmock.AnyArg()).
+			WillReturnRows(sqlmock.NewRows([]string{"id", "cycle_start_date", "amount"}).AddRow("inc", time.Now(), int64(18000000)))
+	}
+
+	// Simulated current-cycle spend per budgeted category — Giải trí lands
+	// "over", Mua sắm lands "near", the rest stay "within" — exercising both
+	// the Trigger and no-Trigger branches of the alert-crossing loop, the
+	// same way the real seed data is designed to (see sampleBudgets).
+	demoSpentByCategory := map[string]int64{
+		"Ăn uống":   0,
+		"Di chuyển": 0,
+		"Hóa đơn":   0,
+		"Mua sắm":   1_180_000,
+		"Giải trí":  470_000,
+	}
+	for _, b := range sampleBudgets {
 		mock.ExpectExec(`INSERT INTO budgets \(id, user_id, category_id, limit_amount, month\)\s+VALUES \(\?, \?, \?, \?, \?\)\s+ON DUPLICATE KEY UPDATE limit_amount = VALUES\(limit_amount\)`).
 			WithArgs(sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg()).
 			WillReturnResult(sqlmock.NewResult(1, 1))
@@ -199,6 +235,17 @@ func TestDemo_Seeding(t *testing.T) {
 			WithArgs(sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg()).
 			WillReturnRows(sqlmock.NewRows([]string{"id", "category_id", "limit_amount", "month"}).
 				AddRow("bid", "cid", int64(1000000), "2026-09"))
+
+		spent := demoSpentByCategory[b.cat]
+		mock.ExpectQuery(`SELECT COALESCE\(SUM\(amount\), 0\) FROM transactions\s+WHERE user_id = \? AND category_id = \? AND type = 'expense' AND date >= \? AND date < \?`).
+			WithArgs(sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg()).
+			WillReturnRows(sqlmock.NewRows([]string{"total"}).AddRow(spent))
+
+		if _, crossed := CrossedThreshold(0, spent, b.limit); crossed {
+			mock.ExpectExec(`INSERT INTO budget_alert_state \(id, user_id, category_id, cycle_start_date, threshold\)\s+VALUES \(\?, \?, \?, \?, \?\)\s+ON DUPLICATE KEY UPDATE threshold = VALUES\(threshold\)`).
+				WithArgs(sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg()).
+				WillReturnResult(sqlmock.NewResult(1, 1))
+		}
 	}
 
 	mock.ExpectCommit()
@@ -254,7 +301,7 @@ func TestDemo_SeedingFailureRollsBack(t *testing.T) {
 
 	mock.ExpectBegin()
 	mock.ExpectExec(`INSERT INTO users \(id, name, email, password_hash\) VALUES \(\?, \?, \?, \?\)`).
-		WithArgs(sqlmock.AnyArg(), "Demo", sqlmock.AnyArg(), sqlmock.AnyArg()).
+		WithArgs(sqlmock.AnyArg(), "Minh Nguyễn", sqlmock.AnyArg(), sqlmock.AnyArg()).
 		WillReturnResult(sqlmock.NewResult(1, 1))
 	// first two category inserts succeed...
 	mock.ExpectExec(`INSERT INTO categories \(id, user_id, name, type, color, icon\) VALUES \(\?, \?, \?, \?, \?, \?\)`).
@@ -289,7 +336,7 @@ func TestDemo_SampleDataFailureRollsBack(t *testing.T) {
 	mock.ExpectBegin()
 
 	mock.ExpectExec(`INSERT INTO users \(id, name, email, password_hash\) VALUES \(\?, \?, \?, \?\)`).
-		WithArgs(sqlmock.AnyArg(), "Demo", sqlmock.AnyArg(), sqlmock.AnyArg()).
+		WithArgs(sqlmock.AnyArg(), "Minh Nguyễn", sqlmock.AnyArg(), sqlmock.AnyArg()).
 		WillReturnResult(sqlmock.NewResult(1, 1))
 
 	seededNames := make([]string, 0, len(defaultCategories))
