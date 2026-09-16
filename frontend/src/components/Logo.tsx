@@ -9,7 +9,7 @@
 export function Logo({
   size = 24,
   className,
-  title = 'HL Company',
+  title = 'HL Finance',
 }: {
   size?: number
   className?: string

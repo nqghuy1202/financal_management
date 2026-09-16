@@ -56,7 +56,7 @@ const vi: Dict = {
   'hero.f1': 'Ghi lại mọi giao dịch chỉ trong vài giây',
   'hero.f2': 'Biểu đồ trực quan theo thời gian thực',
   'hero.f3': 'Dữ liệu của bạn được lưu an toàn',
-  'hero.footer': '© 2026 HL Company - Quản lý tài chính cá nhân',
+  'hero.footer': '© 2026 HL Finance - Quản lý tài chính cá nhân',
 
   // dashboard
   'dash.title': 'Tổng quan',
@@ -252,7 +252,7 @@ const en: Dict = {
   'hero.f1': 'Record any transaction in seconds',
   'hero.f2': 'Real-time visual charts',
   'hero.f3': 'Your data is stored securely',
-  'hero.footer': '© 2026 HL Company - Personal finance manager',
+  'hero.footer': '© 2026 HL Finance - Personal finance manager',
 
   'dash.title': 'Overview',
   'dash.subtitle': 'Your finances for this month.',

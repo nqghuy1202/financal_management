@@ -1,7 +1,7 @@
 <div align="center">
-  <img src="img/Logo-3.png" alt="HL Company" width="140" />
+  <img src="img/Logo-3.png" alt="HL Finance" width="140" />
 
-  <h1>HL Company — Personal Finance Manager</h1>
+  <h1>HL Finance — Personal Finance Manager</h1>
 
   <p>A full-stack personal finance app: track income & expenses, set budgets, and visualize your money — with real authentication and a bilingual (EN/VI) UI.</p>
 
@@ -103,6 +103,8 @@ docker compose up --build -d      # → http://localhost:8080
 # Or build just the image
 docker build -t financal-management .
 ```
+
+**VPS (production):** `docker-compose.prod.yml` + Nginx reverse proxy + Let's Encrypt — see [`DEPLOY.md`](DEPLOY.md) ("Cách 3").
 
 **One-click hosting (Railway):** deploy the repo (auto-detects the Dockerfile), add a MySQL database, and map its connection vars to `BLUEPRINT_DB_*` plus a `JWT_SECRET`. See [`DEPLOY.md`](DEPLOY.md) for details.
 

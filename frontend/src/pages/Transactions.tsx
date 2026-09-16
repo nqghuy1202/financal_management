@@ -320,9 +320,9 @@ export function Transactions() {
         </div>
       ) : (
         <div className="card overflow-hidden">
-          <div className="overflow-x-auto">
+          <div className="max-h-[65vh] overflow-x-auto overflow-y-auto">
             <table className="w-full min-w-[560px] text-sm">
-              <thead>
+              <thead className="sticky top-0 z-10 bg-white">
                 <tr className="border-b border-ink-200 text-left text-xs font-medium uppercase tracking-wide text-ink-400">
                   {visibleCols.content && <th className="px-4 py-3">{tr('tx.colContent')}</th>}
                   {visibleCols.category && <th className="px-4 py-3">{tr('tx.colCategory')}</th>}
@@ -359,8 +359,8 @@ export function Transactions() {
                   </Fragment>
                 ))}
               </tbody>
-              <tfoot>
-                <tr className="border-t-2 border-ink-200 bg-ink-50/70">
+              <tfoot className="sticky bottom-0 z-10">
+                <tr className="border-t-2 border-ink-200 bg-ink-50">
                   {leftCount > 0 && (
                     <td colSpan={leftCount} className="px-4 py-3.5 text-sm font-semibold text-ink-700">
                       {tr('tx.grandTotal')} <span className="font-normal text-ink-400">{tr('tx.grandTotalHint')}</span>

@@ -31,6 +31,12 @@ TAI_LIEU_KY_THUAT.docx
 
 # .env file
 .env
+.env.prod
+
+# VPS production data + local run logs
+data/
+backend.log
+frontend.log
 
 main
 *templ.go

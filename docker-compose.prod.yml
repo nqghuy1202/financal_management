@@ -1,0 +1,61 @@
+# Chạy trên VPS (dùng chung VPS đang chạy debt-crusher):
+#   docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build
+#
+# Khác docker-compose.yml (dev) ở chỗ: app + mysql đều chỉ bind 127.0.0.1 (không public ra internet)
+# — Nginx cài trên chính VPS (không phải container, xem nginx/finance.hlcompany.id.vn.conf) là thứ
+# DUY NHẤT public ra ngoài qua port 80/443, proxy vào app. Cổng host 8081/3307 (khác 8080/3306 mà
+# debt-crusher đã chiếm trên cùng VPS) để tránh đụng port; cổng BÊN TRONG container vẫn 8080/3306
+# như bình thường. Cổng mysql chỉ để SSH tunnel debug khi cần, không dùng để kết nối trực tiếp.
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: financal-app
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      PORT: 8080
+      GIN_MODE: release
+      STATIC_DIR: ./frontend/dist
+      CORS_ORIGINS: ${CORS_ORIGINS}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required — set it in .env.prod}
+      BLUEPRINT_DB_HOST: mysql
+      BLUEPRINT_DB_PORT: 3306
+      BLUEPRINT_DB_DATABASE: ${BLUEPRINT_DB_DATABASE}
+      BLUEPRINT_DB_USERNAME: ${BLUEPRINT_DB_USERNAME}
+      BLUEPRINT_DB_PASSWORD: ${BLUEPRINT_DB_PASSWORD}
+    ports:
+      - "127.0.0.1:8081:8080"
+    networks:
+      - financal-network
+
+  mysql:
+    image: mysql:8.0
+    container_name: financal-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: ${BLUEPRINT_DB_DATABASE}
+      MYSQL_USER: ${BLUEPRINT_DB_USERNAME}
+      MYSQL_PASSWORD: ${BLUEPRINT_DB_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${BLUEPRINT_DB_ROOT_PASSWORD}
+    volumes:
+      - ./data/db_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-p${BLUEPRINT_DB_ROOT_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    ports:
+      # Chỉ bind localhost — để SSH tunnel debug khi cần (xem DEPLOY.md), không public ra internet.
+      - "127.0.0.1:3307:3306"
+    networks:
+      - financal-network
+
+networks:
+  financal-network:
+    driver: bridge

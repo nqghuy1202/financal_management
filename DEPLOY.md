@@ -3,8 +3,8 @@
 App được đóng gói thành **một artifact duy nhất**: server Go (`cmd/web`) vừa phục vụ
 API `/api/*` vừa phục vụ frontend React đã build (`frontend/dist`) kèm SPA fallback.
 
-> Frontend hiện chạy trên dữ liệu giả (localStorage) nên app dùng được ngay mà chưa cần
-> API/CSDL thật. MySQL trong compose đã sẵn cho bước nối API sau này.
+Frontend gọi API thật (`frontend/src/lib/api.ts`) — auth, transactions, budgets, fixed costs,
+safe-to-spend đều đọc/ghi MySQL qua `internal/api`, không còn dùng dữ liệu giả localStorage.
 
 ## Biến môi trường
 
@@ -60,6 +60,104 @@ Dừng: `docker compose down` (thêm `-v` để xóa luôn dữ liệu MySQL).
 curl http://localhost:8080/api/health
 # {"code":20000,"message":"OK","data":{"status":"up"}}
 ```
+
+## Cách 3 — VPS production (dùng chung VPS debt-crusher)
+
+Domain: **finance.hlcompany.id.vn**. Dùng chung VPS đã chạy debt-crusher — Docker, Nginx, Certbot,
+UFW đã cài sẵn từ lần deploy trước, **không cần cài lại**. Kiến trúc:
+
+```
+Browser → Nginx (host, :80/:443, server_name finance.hlcompany.id.vn)
+        → 127.0.0.1:8081 (container financal-app, cổng nội bộ 8080)
+        → MySQL (container financal-mysql, chỉ nội bộ)
+```
+
+Cổng host **8081/3307** (khác 8080/3306 debt-crusher đang chiếm) để tránh đụng port trên cùng VPS —
+cổng bên trong container vẫn 8080/3306 như bình thường.
+
+### 1. Trỏ domain
+
+Thêm bản ghi DNS tại nơi quản lý `hlcompany.id.vn`:
+
+| Type | Name | Value |
+|------|------|-------|
+| A    | `finance` | `<IP_VPS>` (IP đã dùng cho debt-crusher) |
+
+Kiểm tra đã lan truyền trước khi xin SSL: `ping finance.hlcompany.id.vn`.
+
+### 2. Đưa code lên VPS
+
+```bash
+git clone <URL_repo> /opt/financal_management
+cd /opt/financal_management
+```
+
+(hoặc `git pull` nếu đã clone từ trước.)
+
+### 3. Cấu hình secrets
+
+```bash
+cp .env.prod.example .env.prod
+nano .env.prod   # điền JWT_SECRET, BLUEPRINT_DB_PASSWORD, BLUEPRINT_DB_ROOT_PASSWORD — sinh bằng: openssl rand -hex 32
+```
+
+Dùng giá trị **khác** với `.env.prod` của debt-crusher — không tái sử dụng secrets giữa 2 app dù
+chạy chung VPS.
+
+### 4. Build & chạy
+
+```bash
+docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build
+docker compose -f docker-compose.prod.yml ps     # cả 2 service phải "running"/"healthy"
+docker compose -f docker-compose.prod.yml logs -f app   # Ctrl+C để thoát, kiểm tra app boot OK
+```
+
+### 5. Trỏ Nginx vào container
+
+```bash
+cp /opt/financal_management/nginx/finance.hlcompany.id.vn.conf /etc/nginx/sites-available/financal
+ln -s /etc/nginx/sites-available/financal /etc/nginx/sites-enabled/
+nginx -t && systemctl reload nginx
+```
+
+Lúc này `http://finance.hlcompany.id.vn` đã lên được (chưa có HTTPS).
+
+### 6. Bật HTTPS
+
+Certbot đã cài (từ lần deploy debt-crusher) — chỉ cần xin thêm chứng chỉ cho subdomain mới:
+
+```bash
+certbot --nginx -d finance.hlcompany.id.vn
+```
+
+Certbot tự sửa `/etc/nginx/sites-available/financal`: thêm block 443 + redirect 80→443, tự gia hạn.
+
+### 7. Kiểm tra
+
+```bash
+curl https://finance.hlcompany.id.vn/api/health
+```
+
+### Cập nhật code sau này
+
+```bash
+cd /opt/financal_management && git pull
+docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build
+```
+
+`--build` rebuild lại image nếu code đổi; MySQL data ở volume `./data/db_data` không mất.
+
+### Troubleshooting
+
+- **502 Bad Gateway**: container `financal-app` chưa chạy/chưa healthy — check
+  `docker compose -f docker-compose.prod.yml ps` và `... logs app`.
+- **`certbot --nginx` báo domain không resolve**: DNS A record chưa trỏ đúng/chưa kịp lan truyền.
+- **Đổi `JWT_SECRET`/`BLUEPRINT_DB_PASSWORD` sau khi đã chạy**: cần
+  `docker compose -f docker-compose.prod.yml up -d --force-recreate app mysql`; đổi mật khẩu DB sau
+  khi MySQL đã init lần đầu thì phải tự `ALTER USER` trong MySQL, vì biến `MYSQL_PASSWORD` chỉ áp
+  dụng lúc tạo user lần đầu.
+- Debug MySQL qua SSH tunnel khi cần: `ssh -L 3307:127.0.0.1:3307 root@<IP_VPS>` (container không
+  map port ra ngoài internet nên tunnel này an toàn).
 
 ## Lưu ý kiến trúc
 

@@ -48,7 +48,7 @@ export function Register() {
             <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-600 text-white">
               <Logo size={20} />
             </div>
-            <span className="text-lg font-bold text-ink-900">HL Company</span>
+            <span className="text-lg font-bold text-ink-900">HL Finance</span>
           </div>
 
           <h1 className="text-2xl font-bold tracking-tight text-ink-900">{t('register.title')}</h1>
