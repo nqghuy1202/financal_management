@@ -52,6 +52,27 @@ export interface FixedCost {
   amount: number
 }
 
+export type RecurringFrequency = 'weekly' | 'monthly'
+
+// A recurring-transaction *template* — never a real transaction on its own.
+// Confirming its suggested draft (POST /recurring-transactions/:id/confirm)
+// creates a normal Transaction. DueDraftDate is computed fresh by the
+// backend on every GET (mirrors Budget's spent/percent/status): present
+// (yyyy-mm-dd) exactly when the template is active and due/overdue — any
+// number of missed occurrences collapse into that one date — absent when
+// paused or not yet due.
+export interface RecurringTransaction {
+  id: string
+  type: TransactionType
+  amount: number
+  categoryId: string
+  note: string
+  frequency: RecurringFrequency
+  nextDueDate: string // yyyy-mm-dd — the template's own schedule
+  active: boolean
+  dueDraftDate?: string // yyyy-mm-dd, present only when a suggested draft is due
+}
+
 // A user's 1:1 account settings.
 export interface Settings {
   savingsGoal: number

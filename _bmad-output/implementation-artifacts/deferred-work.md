@@ -65,3 +65,15 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-transaction-note-autocomplete.md`
   summary: `noteSuggestions` in `TransactionModal.tsx` linearly scans all of `DataContext.transactions` on every keystroke with no memoized index.
   evidence: Not a real problem at single-user personal-finance data volumes (hundreds to low thousands of rows); worth indexing only if transaction history grows much larger than that.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-recurring-transactions.md`
+  summary: A recurring template whose category is later deleted (`ON DELETE SET NULL`) can never again be updated — `UpdateRecurringTransaction`'s validation unconditionally rejects an empty `CategoryID`, and `RecurringSection.tsx` has no category picker to fix it, so pause/resume/amount-edit become permanently unavailable for that template (delete-and-recreate, losing its schedule, is the only escape).
+  evidence: Confirmed pre-existing — `transactionInput.validate()` for plain `transactions` has the identical `CategoryID == ""` rejection, so editing any regular transaction whose category was deleted already hits the same wall; not introduced by the recurring-transactions story. The recurring case makes it more likely to bite in practice since pause/resume is a normal, frequent interaction (unlike editing an old one-off transaction). A shared fix — letting an update keep an already-empty `CategoryID` — would resolve both.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-recurring-transactions.md`
+  summary: `TransactionModal.tsx`'s `submit()` has no in-flight/disabled guard, so a fast double-click on "Add" or "Confirm" can fire two concurrent requests before the first commits — for confirming a recurring draft specifically, this can create two `transactions` rows from one tap-intent.
+  evidence: Confirmed pre-existing — the same unguarded `submit()` already permits duplicate-click double-adds for plain transactions; the recurring-transactions story inherits the gap for its new "confirm" action rather than introducing it. Fix (disable the button while a request is in flight) is a small, shared, worth-doing-once change across both flows.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-recurring-transactions.md`
+  summary: Neither `recurringTransactionInput.validate()` nor `recurringTransactionUpdateInput.validate()` bounds `Note` to the `recurring_transactions.note VARCHAR(255)` column limit, so an over-length note fails as a raw DB error (500) instead of a 400.
+  evidence: Confirmed pre-existing — `transactionInput.validate()` for plain transactions has the identical gap against `transactions.note VARCHAR(255)`; no note-length validation exists anywhere in the codebase today. A shared fix (one length check, reused by both validators) would close both at once.

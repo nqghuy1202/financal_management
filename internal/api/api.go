@@ -35,6 +35,7 @@ type Handler struct {
 	fixedCosts   *FixedCostRepo
 	incomes      *IncomeRepo
 	settings     *SettingsRepo
+	recurring    *RecurringTransactionRepo
 }
 
 func NewHandler(db *sql.DB, secret []byte) *Handler {
@@ -48,6 +49,7 @@ func NewHandler(db *sql.DB, secret []byte) *Handler {
 		fixedCosts:   NewFixedCostRepo(db),
 		incomes:      NewIncomeRepo(db),
 		settings:     NewSettingsRepo(db),
+		recurring:    NewRecurringTransactionRepo(db),
 	}
 }
 
@@ -129,6 +131,30 @@ type FixedCost struct {
 	ID     string `json:"id"`
 	Name   string `json:"name"`
 	Amount int64  `json:"amount"`
+}
+
+// RecurringTransaction is a template that generates suggested-draft
+// transactions on a weekly/monthly schedule — never a real transactions row
+// on its own (see ConfirmRecurringTransaction). Deliberately separate from
+// FixedCost (a live budgeting constant with no date/frequency/transaction
+// link) — see spec-recurring-transactions.md.
+//
+// DueDraftDate mirrors Budget's Spent/Percent/Status: computed fresh on
+// every GET /recurring-transactions response by attachDueDraft, never
+// stored. It is non-empty exactly when the template is active and due
+// (NextDueDate is today or earlier), and holds the date of its most recent
+// unconfirmed occurrence — any number of missed occurrences collapse into
+// that single date (the "catch up" behavior).
+type RecurringTransaction struct {
+	ID           string `json:"id"`
+	Type         string `json:"type"` // income | expense
+	Amount       int64  `json:"amount"`
+	CategoryID   string `json:"categoryId"`
+	Note         string `json:"note"`
+	Frequency    string `json:"frequency"`   // weekly | monthly
+	NextDueDate  string `json:"nextDueDate"` // yyyy-mm-dd — the template's own schedule
+	Active       bool   `json:"active"`
+	DueDraftDate string `json:"dueDraftDate,omitempty"` // yyyy-mm-dd, computed — see doc comment above
 }
 
 // Settings holds a user's 1:1 account settings.

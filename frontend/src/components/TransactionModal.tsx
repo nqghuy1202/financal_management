@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { Transaction, TransactionType } from '../types'
+import type { RecurringFrequency, Transaction, TransactionType } from '../types'
 import { useData } from '../context/DataContext'
 import { useToast } from '../context/ToastContext'
 import { useI18n } from '../context/I18nContext'
@@ -7,16 +7,33 @@ import { Modal } from './Modal'
 import { CategoryIcon } from './CategoryIcon'
 import { formatNumberInput, parseNumberInput } from '../lib/format'
 
+// A suggested draft (due or "catch up") for a recurring template, as opened
+// from Transactions.tsx's collapsible section — pre-fills the same modal
+// used for adding, but submit confirms the draft (POST
+// /recurring-transactions/:id/confirm) instead of creating a transaction
+// directly, and the "make recurring" toggle never shows (confirming a draft
+// produces a normal transaction, not a nested template).
+export interface RecurringDraft {
+  recurringId: string
+  type: TransactionType
+  amount: number
+  categoryId: string
+  note: string
+  date: string
+}
+
 interface Props {
   open: boolean
   onClose: () => void
   editing?: Transaction | null
+  draft?: RecurringDraft | null
 }
 
 const todayISO = () => new Date().toISOString().slice(0, 10)
 
-export function TransactionModal({ open, onClose, editing }: Props) {
-  const { categories, transactions, addTransaction, updateTransaction } = useData()
+export function TransactionModal({ open, onClose, editing, draft }: Props) {
+  const { categories, transactions, addTransaction, updateTransaction, addRecurringTransaction, confirmRecurringTransaction } =
+    useData()
   const toast = useToast()
   const { t } = useI18n()
   const [type, setType] = useState<TransactionType>('expense')
@@ -29,6 +46,11 @@ export function TransactionModal({ open, onClose, editing }: Props) {
   const [showSuggestions, setShowSuggestions] = useState(false)
   const [activeSuggestion, setActiveSuggestion] = useState(-1)
   const noteFieldRef = useRef<HTMLDivElement>(null)
+  // Recurring toggle: only relevant when adding a brand-new transaction —
+  // never while editing an existing one or confirming a suggested draft.
+  const [makeRecurring, setMakeRecurring] = useState(false)
+  const [frequency, setFrequency] = useState<RecurringFrequency>('monthly')
+  const showRecurringToggle = !editing && !draft
 
   const typeCategories = categories.filter((c) => c.type === type)
 
@@ -73,7 +95,13 @@ export function TransactionModal({ open, onClose, editing }: Props) {
 
   useEffect(() => {
     if (!open) return
-    if (editing) {
+    if (draft) {
+      setType(draft.type)
+      setAmount(formatNumberInput(draft.amount))
+      setCategoryId(draft.categoryId)
+      setNote(draft.note)
+      setDate(draft.date)
+    } else if (editing) {
       setType(editing.type)
       setAmount(formatNumberInput(editing.amount))
       setCategoryId(editing.categoryId)
@@ -87,12 +115,15 @@ export function TransactionModal({ open, onClose, editing }: Props) {
       setDate(todayISO())
     }
     setError('')
-    // Editing an existing transaction means its category was already a deliberate
-    // choice — an autocomplete pick must not silently overwrite it.
-    setCategoryTouched(!!editing)
+    // Editing an existing transaction (or confirming a draft) means its
+    // category was already a deliberate choice — an autocomplete pick must
+    // not silently overwrite it.
+    setCategoryTouched(!!editing || !!draft)
     setShowSuggestions(false)
     setActiveSuggestion(-1)
-  }, [open, editing])
+    setMakeRecurring(false)
+    setFrequency('monthly')
+  }, [open, editing, draft])
 
   // Keep category valid when switching type
   useEffect(() => {
@@ -108,9 +139,25 @@ export function TransactionModal({ open, onClose, editing }: Props) {
     if (!categoryId) return setError(t('err.pickCategory'))
     const payload = { type, amount: value, categoryId, note: note.trim(), date }
     try {
-      if (editing) await updateTransaction({ ...payload, id: editing.id })
-      else await addTransaction(payload)
-      toast.success(editing ? t('toast.txUpdated') : t('toast.txAdded'))
+      if (draft) {
+        await confirmRecurringTransaction(draft.recurringId, payload)
+        toast.success(t('toast.recurringConfirmed'))
+      } else if (editing) {
+        await updateTransaction({ ...payload, id: editing.id })
+        toast.success(t('toast.txUpdated'))
+      } else {
+        await addTransaction(payload)
+        if (makeRecurring) {
+          try {
+            await addRecurringTransaction({ ...payload, frequency })
+            toast.success(t('toast.recurringCreated'))
+          } catch (e) {
+            toast.error(e instanceof Error ? e.message : t('toast.recurringCreateError'))
+          }
+        } else {
+          toast.success(t('toast.txAdded'))
+        }
+      }
       onClose()
     } catch (e) {
       toast.error(e instanceof Error ? e.message : t('toast.txSaveError'))
@@ -122,11 +169,13 @@ export function TransactionModal({ open, onClose, editing }: Props) {
       open={open}
       onClose={onClose}
       size="xl"
-      title={editing ? t('txm.editTitle') : t('txm.addTitle')}
+      title={draft ? t('txm.confirmDraftTitle') : editing ? t('txm.editTitle') : t('txm.addTitle')}
       footer={
         <>
           <button className="btn-outline" onClick={onClose}>{t('common.cancel')}</button>
-          <button className="btn-primary" onClick={submit}>{editing ? t('common.save') : t('common.add')}</button>
+          <button className="btn-primary" onClick={submit}>
+            {draft ? t('common.confirm') : editing ? t('common.save') : t('common.add')}
+          </button>
         </>
       }
     >
@@ -253,6 +302,36 @@ export function TransactionModal({ open, onClose, editing }: Props) {
             </div>
           </div>
         </div>
+
+        {showRecurringToggle && (
+          <div className="rounded-xl border border-ink-200 p-3">
+            <label className="flex cursor-pointer items-center gap-2.5 text-sm font-medium text-ink-700">
+              <input
+                type="checkbox"
+                className="h-4 w-4 rounded border-ink-300 text-brand-600 focus:ring-brand-500/30"
+                checked={makeRecurring}
+                onChange={(e) => setMakeRecurring(e.target.checked)}
+              />
+              {t('txm.makeRecurring')}
+            </label>
+            {makeRecurring && (
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                {(['weekly', 'monthly'] as RecurringFrequency[]).map((opt) => (
+                  <button
+                    key={opt}
+                    type="button"
+                    onClick={() => setFrequency(opt)}
+                    className={`rounded-lg py-2 text-sm font-semibold transition ${
+                      frequency === opt ? 'bg-brand-50 text-brand-700 ring-1 ring-brand-300' : 'bg-ink-100 text-ink-500'
+                    }`}
+                  >
+                    {opt === 'weekly' ? t('recurring.weekly') : t('recurring.monthly')}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {error && <p role="alert" className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-600">{error}</p>}
       </div>

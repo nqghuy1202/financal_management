@@ -7,6 +7,8 @@ import type {
   CycleSummary,
   FixedCost,
   Income,
+  RecurringFrequency,
+  RecurringTransaction,
   Settings,
   Transaction,
 } from '../types'
@@ -39,12 +41,25 @@ interface BudgetInput {
 // initial-load effect below overwrites this immediately on success.
 const DEFAULT_SETTINGS: Settings = { savingsGoal: 0, cycleStartDay: 1 }
 
+// Request body of POST /recurring-transactions — the transaction being
+// marked recurring (logged separately via addTransaction/POST
+// /transactions) plus the chosen frequency.
+interface RecurringTransactionInput {
+  type: Transaction['type']
+  amount: number
+  categoryId: string
+  note: string
+  date: string
+  frequency: RecurringFrequency
+}
+
 interface DataContextValue {
   categories: Category[]
   transactions: Transaction[]
   budgets: Budget[]
   cycleSummary: CycleSummary | null
   fixedCosts: FixedCost[]
+  recurringTransactions: RecurringTransaction[]
   settings: Settings
   loading: boolean
   loadError: boolean
@@ -66,6 +81,11 @@ interface DataContextValue {
   addFixedCost: (fc: Omit<FixedCost, 'id'>) => Promise<void>
   updateFixedCost: (fc: FixedCost) => Promise<void>
   deleteFixedCost: (id: string) => Promise<void>
+
+  addRecurringTransaction: (rt: RecurringTransactionInput) => Promise<void>
+  updateRecurringTransaction: (rt: RecurringTransaction) => Promise<void>
+  deleteRecurringTransaction: (id: string) => Promise<void>
+  confirmRecurringTransaction: (id: string, t: Omit<Transaction, 'id'>) => Promise<void>
 }
 
 const DataContext = createContext<DataContextValue | null>(null)
@@ -79,6 +99,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [budgets, setBudgets] = useState<Budget[]>([])
   const [cycleSummary, setCycleSummary] = useState<CycleSummary | null>(null)
   const [fixedCosts, setFixedCosts] = useState<FixedCost[]>([])
+  const [recurringTransactions, setRecurringTransactions] = useState<RecurringTransaction[]>([])
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS)
   const [loading, setLoading] = useState(false)
   const [loadError, setLoadError] = useState(false)
@@ -98,6 +119,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       setBudgets([])
       setCycleSummary(null)
       setFixedCosts([])
+      setRecurringTransactions([])
       setSettings(DEFAULT_SETTINGS)
       return
     }
@@ -110,14 +132,16 @@ export function DataProvider({ children }: { children: ReactNode }) {
       apiGet<Budget[]>('/budgets'),
       apiGet<CycleSummary>('/cycle/summary'),
       apiGet<FixedCost[]>('/fixed-costs'),
+      apiGet<RecurringTransaction[]>('/recurring-transactions'),
     ])
-      .then(([cats, txs, buds, summary, fcs]) => {
+      .then(([cats, txs, buds, summary, fcs, recurring]) => {
         if (cancelled) return
         setRawCategories(cats)
         setTransactions(txs)
         setBudgets(buds)
         setCycleSummary(summary)
         setFixedCosts(fcs)
+        setRecurringTransactions(recurring)
         setSettings({ savingsGoal: summary.savingsGoal, cycleStartDay: summary.cycleStartDay })
       })
       .catch(() => {
@@ -127,6 +151,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
           setBudgets([])
           setCycleSummary(null)
           setFixedCosts([])
+          setRecurringTransactions([])
           setSettings(DEFAULT_SETTINGS)
           setLoadError(true)
         }
@@ -290,6 +315,55 @@ export function DataProvider({ children }: { children: ReactNode }) {
     [refreshCycleSummary],
   )
 
+  // Best-effort refetch of recurring templates — used after confirming a
+  // suggested draft, since the server recomputes the template's next due
+  // date (and thus its DueDraftDate) via the catch-up math, and that
+  // canonical value isn't part of the confirm response (which returns the
+  // created Transaction, not the template).
+  const refreshRecurringTransactions = useCallback(async () => {
+    try {
+      setRecurringTransactions(await apiGet<RecurringTransaction[]>('/recurring-transactions'))
+    } catch {
+      // ignore — next successful load will reconcile
+    }
+  }, [])
+
+  const addRecurringTransaction = useCallback(async (rt: RecurringTransactionInput) => {
+    const created = await apiSend<RecurringTransaction>('POST', '/recurring-transactions', rt)
+    setRecurringTransactions((prev) => [...prev, created])
+  }, [])
+
+  const updateRecurringTransaction = useCallback(async (rt: RecurringTransaction) => {
+    const updated = await apiSend<RecurringTransaction>('PUT', `/recurring-transactions/${rt.id}`, {
+      type: rt.type,
+      amount: rt.amount,
+      categoryId: rt.categoryId,
+      note: rt.note,
+      frequency: rt.frequency,
+      active: rt.active,
+    })
+    setRecurringTransactions((prev) => prev.map((x) => (x.id === updated.id ? updated : x)))
+  }, [])
+
+  const deleteRecurringTransaction = useCallback(async (id: string) => {
+    await apiSend('DELETE', `/recurring-transactions/${id}`)
+    setRecurringTransactions((prev) => prev.filter((x) => x.id !== id))
+  }, [])
+
+  // Confirms a suggested draft: the server atomically inserts the
+  // transaction and advances the template's schedule, so on success we add
+  // the returned transaction locally (same as addTransaction) and refetch
+  // the recurring list to pick up the new next-due-date / cleared draft.
+  const confirmRecurringTransaction = useCallback(
+    async (id: string, t: Omit<Transaction, 'id'>) => {
+      const created = await apiSend<Transaction>('POST', `/recurring-transactions/${id}/confirm`, t)
+      setTransactions((prev) => [created, ...prev])
+      refreshCycleSummary()
+      refreshRecurringTransactions()
+    },
+    [refreshCycleSummary, refreshRecurringTransactions],
+  )
+
   const value = useMemo<DataContextValue>(
     () => ({
       categories,
@@ -297,6 +371,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       budgets,
       cycleSummary,
       fixedCosts,
+      recurringTransactions,
       settings,
       loading,
       loadError,
@@ -314,6 +389,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
       addFixedCost,
       updateFixedCost,
       deleteFixedCost,
+      addRecurringTransaction,
+      updateRecurringTransaction,
+      deleteRecurringTransaction,
+      confirmRecurringTransaction,
     }),
     [
       categories,
@@ -321,6 +400,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       budgets,
       cycleSummary,
       fixedCosts,
+      recurringTransactions,
       settings,
       loading,
       loadError,
@@ -338,6 +418,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
       addFixedCost,
       updateFixedCost,
       deleteFixedCost,
+      addRecurringTransaction,
+      updateRecurringTransaction,
+      deleteRecurringTransaction,
+      confirmRecurringTransaction,
     ],
   )
 

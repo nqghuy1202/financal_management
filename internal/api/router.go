@@ -38,6 +38,12 @@ func (h *Handler) Register(rg *gin.RouterGroup) {
 		auth.PUT("/fixed-costs/:id", h.UpdateFixedCost)
 		auth.DELETE("/fixed-costs/:id", h.DeleteFixedCost)
 
+		auth.GET("/recurring-transactions", h.ListRecurringTransactions)
+		auth.POST("/recurring-transactions", h.CreateRecurringTransaction)
+		auth.PUT("/recurring-transactions/:id", h.UpdateRecurringTransaction)
+		auth.DELETE("/recurring-transactions/:id", h.DeleteRecurringTransaction)
+		auth.POST("/recurring-transactions/:id/confirm", h.ConfirmRecurringTransaction)
+
 		auth.PUT("/cycle-settings", h.UpdateCycleSettings)
 		auth.GET("/cycle/summary", h.GetCycleSummary)
 		auth.POST("/alerts/:categoryId/:threshold/dismiss", h.DismissAlert)

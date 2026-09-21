@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Competitive research: Personal finance apps — convenience features</title>
+<style>
+  :root {
+    --bg: #f7f8f7;
+    --card-bg: #ffffff;
+    --text: #1a1f1c;
+    --text-muted: #5a635e;
+    --border: #e2e6e2;
+    --accent: #1a7f4b;
+    --accent-soft: #e6f4ec;
+    --high: #1a7f4b;
+    --high-bg: #e6f4ec;
+    --medium: #9a6a00;
+    --medium-bg: #fdf1d8;
+    --low: #b3261e;
+    --low-bg: #fbe9e7;
+    --unverified: #6b3fa0;
+    --unverified-bg: #f1e7fb;
+    --code-bg: #f0f1ef;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #14171a;
+      --card-bg: #1c2023;
+      --text: #e9ece9;
+      --text-muted: #9aa39d;
+      --border: #2c3136;
+      --accent: #4ade80;
+      --accent-soft: #16311f;
+      --high: #4ade80;
+      --high-bg: #16311f;
+      --medium: #f2c14e;
+      --medium-bg: #3a2f0f;
+      --low: #f28b82;
+      --low-bg: #3a1512;
+      --unverified: #c4a3f0;
+      --unverified-bg: #2a1f3a;
+      --code-bg: #24282c;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #14171a;
+    --card-bg: #1c2023;
+    --text: #e9ece9;
+    --text-muted: #9aa39d;
+    --border: #2c3136;
+    --accent: #4ade80;
+    --accent-soft: #16311f;
+    --high: #4ade80;
+    --high-bg: #16311f;
+    --medium: #f2c14e;
+    --medium-bg: #3a2f0f;
+    --low: #f28b82;
+    --low-bg: #3a1512;
+    --unverified: #c4a3f0;
+    --unverified-bg: #2a1f3a;
+    --code-bg: #24282c;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.55;
+  }
+  a { color: var(--accent); }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 0 16px 64px; }
+  header.page-header {
+    padding: 28px 0 20px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 24px;
+  }
+  header.page-header h1 { font-size: 1.5rem; margin: 0 0 10px; }
+  .meta-grid {
+    display: flex; flex-wrap: wrap; gap: 8px 20px;
+    font-size: 0.85rem; color: var(--text-muted);
+  }
+  .meta-grid span b { color: var(--text); font-weight: 600; }
+  nav.toc {
+    position: sticky; top: 0; z-index: 10;
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+    padding: 10px 0;
+    margin-bottom: 24px;
+    display: flex; gap: 14px; flex-wrap: wrap;
+    font-size: 0.82rem;
+  }
+  nav.toc a {
+    text-decoration: none; color: var(--text-muted);
+    padding: 4px 10px; border-radius: 999px; border: 1px solid var(--border);
+  }
+  nav.toc a:hover { color: var(--accent); border-color: var(--accent); }
+  .card {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 22px 24px;
+    margin-bottom: 22px;
+  }
+  .card.exec {
+    border-left: 4px solid var(--accent);
+  }
+  h2 { font-size: 1.2rem; margin-top: 0; scroll-margin-top: 60px; }
+  h3 { font-size: 1rem; margin-bottom: 8px; }
+  h2 a.anchor, h3 a.anchor { display: none; }
+  section { scroll-margin-top: 60px; }
+  ul { padding-left: 22px; }
+  li { margin-bottom: 8px; }
+  .badge {
+    display: inline-block; font-size: 0.68rem; font-weight: 700;
+    letter-spacing: 0.02em; text-transform: uppercase;
+    padding: 2px 8px; border-radius: 999px; margin-left: 6px;
+    vertical-align: middle;
+  }
+  .badge.high { color: var(--high); background: var(--high-bg); }
+  .badge.medium { color: var(--medium); background: var(--medium-bg); }
+  .badge.low { color: var(--low); background: var(--low-bg); }
+  .badge.unverified { color: var(--unverified); background: var(--unverified-bg); font-weight: 800; }
+  .cite {
+    color: var(--accent); text-decoration: none; font-size: 0.82em;
+    font-weight: 600; padding: 0 2px;
+  }
+  .cite:hover { text-decoration: underline; }
+  .caveat {
+    background: var(--medium-bg); color: var(--medium);
+    border-radius: 10px; padding: 10px 14px; font-size: 0.88rem;
+    margin-top: 14px;
+  }
+  .rec { border-left: 3px solid var(--accent); padding-left: 14px; margin-bottom: 16px; }
+  .rec .num { font-weight: 800; color: var(--accent); }
+  details.sources { margin-top: 8px; }
+  details.sources summary {
+    cursor: pointer; font-weight: 600; padding: 10px 0;
+    color: var(--accent);
+  }
+  table.sources { width: 100%; border-collapse: collapse; font-size: 0.82rem; margin-top: 10px; }
+  table.sources td { border-bottom: 1px solid var(--border); padding: 8px 6px; vertical-align: top; }
+  table.sources tr:target { background: var(--accent-soft); }
+  .stale-box { font-size: 0.9rem; }
+  .stale-box .date { font-weight: 700; color: var(--accent); }
+  footer { text-align: center; color: var(--text-muted); font-size: 0.78rem; padding: 24px 0; }
+  code { background: var(--code-bg); padding: 1px 5px; border-radius: 5px; font-size: 0.85em; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="page-header">
+  <h1>Competitive research: Personal finance apps — convenience features</h1>
+  <div class="meta-grid">
+    <span><b>Decision:</b> Which convenient, high-impact features should HL Finance consider adding next</span>
+    <span><b>Type:</b> Competitive</span>
+    <span><b>Date:</b> 2026-09-21</span>
+    <span><b>Depth:</b> Standard (1 round, 6 apps, 3 clusters)</span>
+    <span><b>Validation:</b> Normal + semantic citation fidelity pass</span>
+  </div>
+</header>
+
+<nav class="toc">
+  <a href="#exec">Executive summary</a>
+  <a href="#dim1">Feature teardown</a>
+  <a href="#dim2">Customer voice</a>
+  <a href="#cross">Cross-dimension</a>
+  <a href="#recs">Recommendations</a>
+  <a href="#open">Open questions</a>
+  <a href="#sources">Sources</a>
+  <a href="#stale">Staleness</a>
+</nav>
+
+<section id="exec">
+<div class="card exec">
+  <h2>Executive summary</h2>
+  <p>Across 6 apps (Money Lover, MISA Sổ Thu Chi — VN; YNAB, Monarch Money — international structured budgeting, the latter widely covered as the de facto successor after Intuit shut Mint down in March 2024 <a class="cite" href="#src-9">[9]</a><a class="cite" href="#src-10">[10]</a> — the scale of user migration itself is only aggregator-sourced, see Open Questions; Spendee, Monefy — lightweight trackers), three findings drive the recommendation:</p>
+  <ol>
+    <li><b>Users consistently value fast manual entry over automation.</b> Praise clusters around 2-tap/quick entry (Monefy), simple categorization (Spendee), and note/payee memory — not around OCR or bank-sync, which are weakly evidenced as loved features and, where present, are the #1 source of complaints when they break.</li>
+    <li><b>Recurring/scheduled transactions are near-universal and the most concretely evidenced gap in HL Finance today.</b> Every app studied ships some form of it (YNAB Scheduled Transactions, Monarch's ~80%-auto-detect Recurring calendar, Money Lover, MISA, Monefy's paid tier) — a standard expectation, not a differentiator, and HL Finance has nothing like it.</li>
+    <li><b>Bank-linking/auto-sync is a trap, not a feature to chase.</b> Where it's shipped, it's a liability in three independent clusters — Spendee's #1 complaint is sync breaking down over years of use <a class="cite" href="#src-20">[20]</a>; Monarch's sync reliability is a common complaint (aggregator-synthesized); VN users report avoiding bank-linking outright for security reasons <a class="cite" href="#src-13">[13]</a>. This corroborates — independently of the user's earlier decision — that avoiding bank-API/SMS linking for HL Finance is right.</li>
+  </ol>
+  <div class="caveat">⚠ <b>Biggest caveat:</b> most "customer voice" claims come from aggregator-synthesized review themes rather than directly-fetched, individually dated reviews (Google Play fetches largely failed this session). Confidence is marked per claim; treat low-confidence items as directional, not settled.</div>
+</div>
+</section>
+
+<section id="dim1">
+<div class="card">
+  <h2>Dimension 1 — Feature teardown</h2>
+
+  <h3>What's near-universal <span class="badge high">ship, low differentiation risk</span></h3>
+  <ul>
+    <li><b>Recurring/scheduled transactions.</b> YNAB's Scheduled Transactions auto-drop into the register on a set frequency and auto-match against bank imports <a class="cite" href="#src-1">[1]</a>; Monarch's Recurring calendar auto-detects ~80% of recurring items and lets users add the rest manually <a class="cite" href="#src-8">[8]</a>; Money Lover and MISA both advertise recurring-transaction automation <a class="cite" href="#src-11">[11]</a><a class="cite" href="#src-15">[15]</a>; Monefy gates it behind its paid tier <a class="cite" href="#src-22">[22]</a>. <b>HL Finance has no equivalent today</b> — the clearest, most corroborated gap.</li>
+    <li><b>Reports/visual breakdowns.</b> Every app ships category charts (Monefy's donut-chart UI <a class="cite" href="#src-28">[28]</a> <span class="badge medium">medium</span>; YNAB's spending/net-worth reports <a class="cite" href="#src-4">[4]</a>; Money Lover's pie/bar charts per its Play listing <a class="cite" href="#src-25">[25]</a> <span class="badge medium">low-med</span>) — HL Finance already covers this via the safe-to-spend dashboard and budget-status pill: table-stakes already met.</li>
+    <li><b>Multi-currency / multi-wallet.</b> Ships in Money Lover, MISA, Spendee, Monefy (150+ currencies <a class="cite" href="#src-22">[22]</a>) — likely low priority for a single-user VND-only app.</li>
+  </ul>
+
+  <h3>What's praised for entry speed specifically <span class="badge high">the pattern that matters most</span></h3>
+  <ul>
+    <li>Monefy: "record any purchase in two taps" <a class="cite" href="#src-22">[22]</a>; users spontaneously praise "quick and easy logging" <a class="cite" href="#src-23">[23]</a>.</li>
+    <li>Spendee: praised for being "easy and clear" for simple tracking <a class="cite" href="#src-20">[20]</a>, independent of any automation feature.</li>
+    <li>YNAB: a long-press on the Android icon launches transaction entry directly <a class="cite" href="#src-3">[3]</a>; Auto-Assign speeds budget allocation, reflecting the same "reduce taps" instinct <a class="cite" href="#src-2">[2]</a>.</li>
+    <li>Money Lover (Tinh Tế forum): a user contrasts manual entry as the friction point ("khâu ngồi nhập nhập làm biếng quá") while still preferring it for small-scale bookkeeping <a class="cite" href="#src-13">[13]</a> — confirms manual entry works when <i>fast</i>, exactly what HL Finance's shipped note/category autocomplete targets.</li>
+    <li>MISA's own marketing claims sub-1-minute logging <a class="cite" href="#src-16">[16]</a> <span class="badge medium">promotional, medium</span> — entry speed is a headline selling point even for the more feature-heavy VN app.</li>
+  </ul>
+
+  <h3>Weakly-evidenced / risky to chase <span class="badge low">low confidence</span></h3>
+  <ul>
+    <li><b>OCR/receipt scanning.</b> Advertised by Money Lover <a class="cite" href="#src-11">[11]</a>, MISA <a class="cite" href="#src-15">[15]</a>, Spendee <a class="cite" href="#src-19">[19]</a> — but Spendee's is paywalled per a low-confidence source <a class="cite" href="#src-24">[24]</a>, and no reviews spontaneously praised it. Reads as a marketing checkbox, not a proven win.</li>
+    <li><b>Rules-based auto-categorization.</b> Monarch's "save an edit as a rule" concept <a class="cite" href="#src-7">[7]</a> is well-designed on paper, but the most consistent complaint is inaccurate categorization ("constantly miscategorizing" <a class="cite" href="#src-26">[26]</a> <span class="badge medium">low-med</span>; Spendee ML "isn't always dependable" <a class="cite" href="#src-21">[21]</a>). Should default to suggest-and-confirm — exactly how the shipped autocomplete already behaves.</li>
+    <li><b>Bank-account linking.</b> See Dimension 2 — evidenced as a liability, not an asset, once shipped.</li>
+  </ul>
+
+  <h3>VN-specific signal</h3>
+  <ul>
+    <li>MISA and MoMo (per a competitor's own comparison <span class="badge low">low</span>) are positioned as fully free for core features, while Money Lover's own Play Store reviews complain recurring transactions (once free) are now paywalled at ~$35 <a class="cite" href="#src-25">[25]</a>. Separately, <a class="cite" href="#src-17">[17]</a><a class="cite" href="#src-18">[18]</a> describe Money Lover paywalling export/attachment/sync more broadly. Not directly actionable (no pricing model), but confirms VN users are price-sensitive to gated convenience features.</li>
+    <li>Money Lover's marketing claims 25+ VN bank integrations <a class="cite" href="#src-12">[12]</a> — unverified independently, directional only.</li>
+  </ul>
+</div>
+</section>
+
+<section id="dim2">
+<div class="card">
+  <h2>Dimension 2 — Customer voice</h2>
+
+  <h3>Praise pattern <span class="badge high">converges across all 3 clusters</span></h3>
+  <ul>
+    <li>Fast, low-friction manual entry (Monefy <a class="cite" href="#src-23">[23]</a>, Spendee <a class="cite" href="#src-20">[20]</a>, Money Lover café-bookkeeping use case <a class="cite" href="#src-13">[13]</a>).</li>
+    <li>Category-based visual tracking (Monefy pie chart <a class="cite" href="#src-23">[23]</a>; YNAB's 4.8/5 across ~55K ratings <a class="cite" href="#src-5">[5]</a>).</li>
+    <li>Shared/household accounts (MISA — "easiest app… to keep track of bank accounts, credit cards and cash wallet" <a class="cite" href="#src-15">[15]</a>; Monarch's couples dashboard <a class="cite" href="#src-27">[27]</a> <span class="badge medium">low-med</span>).</li>
+  </ul>
+
+  <h3>Complaint pattern <span class="badge unverified">strongest signal in this research</span></h3>
+  <ul>
+    <li><b>Sync/bank-link reliability breaking down over time:</b> Spendee — "the app has stopped synching which has rendered it useless" after years working <a class="cite" href="#src-20">[20]</a>; Monarch — called "the most common complaint… for most aggregator-based budgeting apps in general" <span class="badge medium">low-med, no URL</span>; Money Lover VN forum — active avoidance of bank-linking for security reasons <a class="cite" href="#src-13">[13]</a>.</li>
+    <li><b>Onboarding gaps causing data loss:</b> Monefy — no in-app guidance, user "Deleted my main account" <a class="cite" href="#src-23">[23]</a>.</li>
+    <li><b>Cross-device sync drift:</b> Monefy — after reinstall, "never balanced correctly again" <a class="cite" href="#src-23">[23]</a>.</li>
+    <li><b>Progressive paywalling:</b> Money Lover recurring transactions moved behind a ~$35 paywall <a class="cite" href="#src-25">[25]</a> <span class="badge medium">low-med</span>.</li>
+    <li><b>Auto-categorization inaccuracy:</b> Monarch, Spendee (see Dimension 1).</li>
+    <li><b>Price and learning curve:</b> YNAB's $109/yr + steep learning curve are its top complaints, causing abandonment within two weeks <a class="cite" href="#src-6">[6]</a> <span class="badge medium">low-med</span>.</li>
+    <li><b>Too many taps / feature bloat:</b> a VN forum thread on Money Lover (secondhand summary only, source blocked) describes "more taps than MISA" and "too many unnecessary features" <a class="cite" href="#src-14">[14]</a> <span class="badge low">low</span>.</li>
+  </ul>
+</div>
+</section>
+
+<section id="cross">
+<div class="card">
+  <h2>Cross-dimension insights</h2>
+  <ul>
+    <li>The feature teardown shows bank-linking and OCR as commonly <i>shipped</i>, but customer voice shows they don't drive praise — and are the top complaint driver once shipped. For an app that already ruled out bank-API/SMS linking, this isn't a gap to fill; it would likely have been a liability.</li>
+    <li>Recurring/scheduled transactions is both near-universal in the teardown <i>and</i>, where it shows up in customer voice, appears as unmet demand rather than a complaint about the concept: Monefy users wish for better recurring-item visibility <a class="cite" href="#src-23">[23]</a> — evidence <i>for</i> building it.</li>
+    <li>Autocomplete (already shipped) sits exactly on the pattern this research validates most: fast manual entry, suggest-don't-auto-apply. Retroactively confirms it was the right feature to ship first.</li>
+  </ul>
+</div>
+</section>
+
+<section id="recs">
+<div class="card">
+  <h2>Recommendations</h2>
+  <div class="rec"><span class="num">1.</span> <b>Build recurring/scheduled transactions next.</b> <span class="badge high">highest confidence</span> Near-universal across competitors (4 independent apps), no push-back against the concept — the only related signal is Monefy users wanting <i>more</i> recurring visibility <a class="cite" href="#src-23">[23]</a>. Suggested shape: mark a transaction recurring with a frequency; app surfaces a suggested draft near the due date for one-tap confirm (never silent auto-creation — consistent with the "suggest, don't auto-apply" pattern validated throughout). <i>Feeds: next BMAD spec/epic candidate.</i></div>
+  <div class="rec"><span class="num">2.</span> <b>Do not pursue bank-account linking or SMS parsing.</b> <span class="badge high">confirmed independently</span> Top complaint driver in three of three clusters, not just a risk-management tradeoff. <i>Feeds: architecture constraint for future PRDs.</i></div>
+  <div class="rec"><span class="num">3.</span> <b>If auto-categorization/rules are ever considered, keep them suggest-and-confirm, never silent.</b> <span class="badge medium">medium confidence</span> Matches the design already validated by the shipped autocomplete feature.</div>
+  <div class="rec"><span class="num">4.</span> <b>Deprioritize OCR/receipt scanning.</b> <span class="badge low">low confidence it drives satisfaction</span> Weakly sourced, often paywalled; not worth near-term investment relative to recurring transactions.</div>
+</div>
+</section>
+
+<section id="open">
+<div class="card">
+  <h2>Open questions</h2>
+  <ul>
+    <li>What do individually-dated, verbatim Google Play reviews say for Money Lover, MISA, Monarch, and Monefy? Play Store fetches largely failed this session (JS-heavy pages).</li>
+    <li>Does Spendee's own site (not the MWM.ai republished page) confirm which features are Plus-tier-gated vs free?</li>
+    <li>Is there a well-evidenced case for widgets or wearable (Watch) entry? Only aggregator-sourced this session for any app.</li>
+    <li>A direct read of the VOZ Money Lover fee-complaint thread (blocked, 403) and the Tinh Tế multi-app comparison thread (found, not fetched) would deepen the VN-specific complaint picture.</li>
+  </ul>
+  <p style="color:var(--text-muted); font-size:0.88rem;">Route: any of the above could be chased with a <b>Deepen</b> pass on this run folder if recurring-transactions gets scoped into a spec and higher-confidence competitor detail is wanted first.</p>
+</div>
+</section>
+
+<section id="sources">
+<div class="card">
+  <h2>Source appendix</h2>
+  <details class="sources" open>
+    <summary>28 sources (click to collapse)</summary>
+    <table class="sources"><tbody><tr id="src-1"><td>[1]</td><td><a href="https://support.ynab.com/en_us/scheduled-transactions-a-guide-BygrAIFA9" target="_blank" rel="noopener">YNAB — Scheduled Transactions guide</a></td><td>YNAB Support</td><td>n/d</td><td>2026-09-21</td><td>high</td></tr><tr id="src-2"><td>[2]</td><td><a href="https://support.ynab.com/en_us/auto-assign-a-guide-r1gBNbBJo" target="_blank" rel="noopener">YNAB — Auto-Assign guide</a></td><td>YNAB Support</td><td>n/d</td><td>2026-09-21</td><td>high</td></tr><tr id="src-3"><td>[3]</td><td><a href="https://www.ynab.com/blog/pressing-news-ynabs-android-app-has-long-press-functionality" target="_blank" rel="noopener">YNAB blog — Android long-press</a></td><td>YNAB</td><td>n/d</td><td>2026-09-21</td><td>high</td></tr><tr id="src-4"><td>[4]</td><td><a href="https://www.ynab.com/features" target="_blank" rel="noopener">YNAB — Features page</a></td><td>YNAB</td><td>n/d</td><td>2026-09-21</td><td>high</td></tr><tr id="src-5"><td>[5]</td><td><a href="https://apps.apple.com/us/app/ynab/id1010865877" target="_blank" rel="noopener">YNAB — App Store listing</a></td><td>Apple App Store</td><td>n/d</td><td>2026-09-21</td><td>medium</td></tr><tr id="src-6"><td>[6]</td><td><a href="https://www.trustpilot.com/review/ynab.com" target="_blank" rel="noopener">YNAB — Trustpilot</a></td><td>Trustpilot</td><td>n/d</td><td>2026-09-21</td><td>low-medium</td></tr><tr id="src-7"><td>[7]</td><td><a href="https://help.monarch.com/hc/en-us/articles/360048393372-Transaction-Rules" target="_blank" rel="noopener">Monarch — Transaction Rules</a></td><td>Monarch Help Center</td><td>n/d</td><td>2026-09-21</td><td>medium (403 on direct fetch; via snippet)</td></tr><tr id="src-8"><td>[8]</td><td><a href="https://help.monarch.com/hc/en-us/articles/4890751141908" target="_blank" rel="noopener">Monarch — Tracking Recurring Expenses</a> + [blog](https://www.monarch.com/blog/track-recurring-bills-and-subscriptions)</td><td>Monarch</td><td>n/d</td><td>2026-09-21</td><td>medium</td></tr><tr id="src-9"><td>[9]</td><td><a href="https://betakit.com/as-intuit-winds-down-mint-financial-planning-app-monarch-money-comes-to-canada/" target="_blank" rel="noopener">BetaKit — Mint shutdown / Monarch</a></td><td>BetaKit</td><td>2024</td><td>2026-09-21</td><td>medium-high</td></tr><tr id="src-10"><td>[10]</td><td><a href="https://www.monarch.com/blog/mint-shutting-down" target="_blank" rel="noopener">Monarch — Mint shutting down</a></td><td>Monarch blog</td><td>2024</td><td>2026-09-21</td><td>medium</td></tr><tr id="src-11"><td>[11]</td><td><a href="https://apps.apple.com/us/app/money-lover-s%E1%BB%95-thu-chi/id486312413?l=vi" target="_blank" rel="noopener">Money Lover — App Store listing</a></td><td>Apple App Store</td><td>n/d</td><td>2026-09-21</td><td>high</td></tr><tr id="src-12"><td>[12]</td><td><a href="https://www.thegioididong.com/game-app/money-lover-ung-dung-quan-ly-chi-tieu-ca-nhan-gia-dinh-228454" target="_blank" rel="noopener">Thế Giới Di Động — Money Lover</a> / [moneylover.me](https://moneylover.me/vi/)</td><td>TGDD / Money Lover</td><td>n/d</td><td>2026-09-21</td><td>medium</td></tr><tr id="src-13"><td>[13]</td><td><a href="https://tinhte.vn/thread/chia-se-vai-tinh-nang-hay-ho-it-duoc-biet-den-tren-money-lover.3057453/" target="_blank" rel="noopener">Tinh Tế — Money Lover features thread</a></td><td>Tinh Tế forum</td><td>n/d</td><td>2026-09-21</td><td>medium</td></tr><tr id="src-14"><td>[14]</td><td><a href="https://voz.vn/t/money-lover-thu-phi-cac-bac-co-nang-cap-len-khong.636227/" target="_blank" rel="noopener">VOZ — Money Lover fees thread</a></td><td>VOZ forum</td><td>n/d</td><td>2026-09-21</td><td>low (403, secondhand summary only)</td></tr><tr id="src-15"><td>[15]</td><td><a href="https://apps.apple.com/us/app/s%E1%BB%95-thu-chi-misa/id865818973?l=vi" target="_blank" rel="noopener">MISA Sổ Thu Chi — App Store listing</a></td><td>Apple App Store</td><td>n/d</td><td>2026-09-21</td><td>high</td></tr><tr id="src-16"><td>[16]</td><td><a href="https://www.misa.vn/62264/so-thu-chi-money-keeper-tro-ly-tai-chinh-ca-nhan-mien-phi/" target="_blank" rel="noopener">MISA — official blog</a></td><td>MISA JSC</td><td>n/d</td><td>2026-09-21</td><td>medium</td></tr><tr id="src-17"><td>[17]</td><td><a href="https://premiumvns.com/so-sanh-so-thu-chi-misa-va-money-lover/" target="_blank" rel="noopener">premiumvns.com — MISA vs Money Lover comparison</a></td><td>premiumvns.com</td><td>n/d</td><td>2026-09-21</td><td>low-medium (commercial interest)</td></tr><tr id="src-18"><td>[18]</td><td><a href="https://www.momo.vn/blog/ung-dung-quan-ly-tai-chinh-ca-nhan-pho-bien-nhat-c103dt2282" target="_blank" rel="noopener">MoMo blog — VN finance apps comparison</a></td><td>MoMo</td><td>n/d</td><td>2026-09-21</td><td>low (competitor&#x27;s blog)</td></tr><tr id="src-19"><td>[19]</td><td><a href="https://mwm.ai/apps/expense-budget-app-spendee/635861140" target="_blank" rel="noopener">MWM.ai — Spendee app page</a></td><td>MWM.ai</td><td>n/d</td><td>2026-09-21</td><td>medium</td></tr><tr id="src-20"><td>[20]</td><td><a href="https://www.trustpilot.com/review/spendee.com" target="_blank" rel="noopener">Spendee — Trustpilot</a></td><td>Trustpilot</td><td>Jan–Sep 2025/2026</td><td>2026-09-21</td><td>high (verbatim, dated)</td></tr><tr id="src-21"><td>[21]</td><td><a href="https://frugalforless.com/spendee-review" target="_blank" rel="noopener">Frugal for Less — Spendee review</a> (+ G2, aggregated)</td><td>aggregator</td><td>n/d</td><td>2026-09-21</td><td>medium</td></tr><tr id="src-22"><td>[22]</td><td><a href="https://www.monefy.com/" target="_blank" rel="noopener">Monefy — official site</a></td><td>Monefy</td><td>n/d</td><td>2026-09-21</td><td>high</td></tr><tr id="src-23"><td>[23]</td><td><a href="https://justuseapp.com/en/app/1212024409/monefy-money-tracker/reviews" target="_blank" rel="noopener">JustUseApp — Monefy reviews</a></td><td>JustUseApp (aggregator)</td><td>n/d</td><td>2026-09-21</td><td>medium</td></tr><tr id="src-24"><td>[24]</td><td><a href="https://appgrooves.com/" target="_blank" rel="noopener">AppGrooves — Spendee/Monefy comparison</a></td><td>AppGrooves</td><td>n/d</td><td>2026-09-21</td><td>low</td></tr><tr id="src-25"><td>[25]</td><td><a href="https://play.google.com/store/apps/details?id=com.tj.money.lover" target="_blank" rel="noopener">Money Lover — Google Play listing</a> (search snippet, fetch truncated)</td><td>Google Play</td><td>n/d</td><td>2026-09-21</td><td>low-medium</td></tr><tr id="src-26"><td>[26]</td><td>Search-engine synthesis of App Store/Trustpilot/justuseapp content re: Monarch mis-categorization (no single primary URL captured)</td><td>aggregator</td><td>n/d</td><td>2026-09-21</td><td>low-medium</td></tr><tr id="src-27"><td>[27]</td><td>Search-engine synthesis of Reddit/r/personalfinance discussion re: Monarch community sentiment and couples dashboard (no single primary URL captured)</td><td>aggregator</td><td>n/d</td><td>2026-09-21</td><td>low-medium</td></tr><tr id="src-28"><td>[28]</td><td>Search-engine synthesis of app-description summaries re: Monefy&#x27;s donut-chart UI (no single primary URL captured, distinct from monefy.com itself)</td><td>aggregator</td><td>n/d</td><td>2026-09-21</td><td>medium</td></tr></tbody></table>
+  </details>
+</div>
+</section>
+
+<section id="stale">
+<div class="card stale-box">
+  <h2>Staleness map</h2>
+  <p>Per the competitive research pack: pricing &amp; features ≤ 3 months · trajectory signals ≤ 6 months · customer sentiment ≤ 12 months. All claims accessed <b>2026-09-21</b>.</p>
+  <p>Re-check features/pricing claims by <span class="date">2026-12-21</span>. Re-check customer-sentiment claims by <span class="date">2027-09-21</span>.</p>
+  <p><b>Earliest re-check date: 2026-12-21</b> (feature/pricing class).</p>
+</div>
+</section>
+
+<footer>
+  Generated by bmad-deep-recon · competitive research · run folder: <code>competitive-personal-finance-apps-convenience-featur-2026-09-21</code>
+</footer>
+
+</div>
+</body>
+</html>

@@ -122,6 +122,29 @@ func Migrate(db *sql.DB) error {
 			CONSTRAINT fk_alert_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
 			CONSTRAINT fk_alert_category FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE CASCADE
 		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
+
+		// recurring_transactions holds recurring-transaction *templates* only —
+		// confirming one inserts a normal row into `transactions` (never this
+		// table), and this table is never read by any budget/summary
+		// calculation. Deliberately a separate table from `transactions`
+		// (mirrors its transaction-shaped columns) and from `fixed_costs`
+		// (a live budgeting constant, not a transaction-entry convenience) —
+		// see spec-recurring-transactions.md's Intent/Boundaries.
+		`CREATE TABLE IF NOT EXISTS recurring_transactions (
+			id            CHAR(36)                 NOT NULL PRIMARY KEY,
+			user_id       CHAR(36)                 NOT NULL,
+			type          ENUM('income','expense') NOT NULL,
+			amount        BIGINT                   NOT NULL,
+			category_id   CHAR(36)                 NULL,
+			note          VARCHAR(255)             NOT NULL DEFAULT '',
+			frequency     ENUM('weekly','monthly') NOT NULL,
+			next_due_date DATE                     NOT NULL,
+			active        BOOLEAN                  NOT NULL DEFAULT TRUE,
+			created_at    TIMESTAMP                NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			INDEX idx_recurring_tx_user (user_id),
+			CONSTRAINT fk_recurring_tx_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+			CONSTRAINT fk_recurring_tx_category FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE SET NULL
+		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`,
 	}
 	for _, s := range stmts {
 		if _, err := db.Exec(s); err != nil {

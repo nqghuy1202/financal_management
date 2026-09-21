@@ -13,7 +13,8 @@ import { useData } from '../context/DataContext'
 import { useToast } from '../context/ToastContext'
 import { useI18n } from '../context/I18nContext'
 import type { Transaction } from '../types'
-import { TransactionModal } from '../components/TransactionModal'
+import { TransactionModal, type RecurringDraft } from '../components/TransactionModal'
+import { RecurringSection } from '../components/RecurringSection'
 import { formatCurrency } from '../lib/format'
 
 type GroupBy = 'none' | 'category' | 'type'
@@ -39,6 +40,7 @@ export function Transactions() {
   const { t: tr } = useI18n()
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState<Transaction | null>(null)
+  const [draft, setDraft] = useState<RecurringDraft | null>(null)
 
   // Table options (all inside one dropdown)
   const [query, setQuery] = useState('')
@@ -117,10 +119,17 @@ export function Transactions() {
 
   const openAdd = () => {
     setEditing(null)
+    setDraft(null)
     setModalOpen(true)
   }
   const openEdit = (t: Transaction) => {
     setEditing(t)
+    setDraft(null)
+    setModalOpen(true)
+  }
+  const openDraft = (d: RecurringDraft) => {
+    setEditing(null)
+    setDraft(d)
     setModalOpen(true)
   }
   const toggleCol = (key: ColKey) => setVisibleCols((v) => ({ ...v, [key]: !v[key] }))
@@ -185,6 +194,8 @@ export function Transactions() {
           <Plus size={17} /> {tr('tx.add')}
         </button>
       </div>
+
+      <RecurringSection onOpenDraft={openDraft} />
 
       {/* Summary strip */}
       <div className="grid gap-4 sm:grid-cols-3">
@@ -381,7 +392,7 @@ export function Transactions() {
         </div>
       )}
 
-      <TransactionModal open={modalOpen} onClose={() => setModalOpen(false)} editing={editing} />
+      <TransactionModal open={modalOpen} onClose={() => setModalOpen(false)} editing={editing} draft={draft} />
     </div>
   )
 }
