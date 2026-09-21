@@ -49,3 +49,19 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-1-5-safe-to-spend-frontend.md`
   summary: A background `refreshCycleSummary()` call in `DataContext` can have its response land after logout (or a fast account switch) with no cancellation guard, momentarily writing stale or another session's cycle data into state.
   evidence: Real but low-probability (requires a logout exactly while a refresh is in flight); a proper fix needs a request-token or mounted-ref pattern akin to the `cancelled` flag the initial mount effect already uses, more than a direct correction — worth doing if this pattern is revisited for other reasons.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-transaction-note-autocomplete.md`
+  summary: The note-autocomplete dropdown in `TransactionModal.tsx` can be clipped by the modal's `overflow-y-auto` scroll container on short viewports since it's absolutely positioned inside that scroll box rather than portaled.
+  evidence: Real on mobile/short-viewport modals; fixing needs portal-based positioning (e.g. a floating-UI style anchor), not a simple correction — worth doing if the modal gains more overlay-style widgets.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-transaction-note-autocomplete.md`
+  summary: The frontend has no test framework or test files anywhere in the project; `TransactionModal.tsx` (including the new autocomplete interaction logic) has zero coverage.
+  evidence: Pre-existing gap across the whole frontend, not introduced by this change — confirmed no vitest/jest config or `*.test.*`/`*.spec.*` files exist under `frontend/src`. Worth addressing as its own initiative (pick a test runner, seed the first few component tests) rather than folding into a single feature spec.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-transaction-note-autocomplete.md`
+  summary: Note-autocomplete only recalls `note` + `categoryId`; recurring transactions (e.g. "Coffee") usually also repeat the same `amount`, which the current feature doesn't offer to fill.
+  evidence: Deliberately out of scope for this spec's frozen Intent (note + category only); a natural follow-up if the feature proves useful.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-transaction-note-autocomplete.md`
+  summary: `noteSuggestions` in `TransactionModal.tsx` linearly scans all of `DataContext.transactions` on every keystroke with no memoized index.
+  evidence: Not a real problem at single-user personal-finance data volumes (hundreds to low thousands of rows); worth indexing only if transaction history grows much larger than that.

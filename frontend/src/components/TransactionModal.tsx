@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Transaction, TransactionType } from '../types'
 import { useData } from '../context/DataContext'
 import { useToast } from '../context/ToastContext'
@@ -16,7 +16,7 @@ interface Props {
 const todayISO = () => new Date().toISOString().slice(0, 10)
 
 export function TransactionModal({ open, onClose, editing }: Props) {
-  const { categories, addTransaction, updateTransaction } = useData()
+  const { categories, transactions, addTransaction, updateTransaction } = useData()
   const toast = useToast()
   const { t } = useI18n()
   const [type, setType] = useState<TransactionType>('expense')
@@ -25,8 +25,51 @@ export function TransactionModal({ open, onClose, editing }: Props) {
   const [note, setNote] = useState('')
   const [date, setDate] = useState(todayISO())
   const [error, setError] = useState('')
+  const [categoryTouched, setCategoryTouched] = useState(false)
+  const [showSuggestions, setShowSuggestions] = useState(false)
+  const [activeSuggestion, setActiveSuggestion] = useState(-1)
+  const noteFieldRef = useRef<HTMLDivElement>(null)
 
   const typeCategories = categories.filter((c) => c.type === type)
+
+  const noteSuggestions = useMemo(() => {
+    const q = note.trim().toLowerCase()
+    if (q.length < 2) return []
+    const seen = new Set<string>()
+    const out: { note: string; categoryId: string }[] = []
+    for (const tx of transactions) {
+      if (tx.type !== type) continue
+      const n = tx.note.trim()
+      if (!n) continue
+      const key = n.toLowerCase()
+      if (!key.includes(q) || seen.has(key)) continue
+      seen.add(key)
+      out.push({ note: n, categoryId: tx.categoryId })
+      if (out.length >= 8) break
+    }
+    return out
+  }, [note, transactions, type])
+
+  const selectSuggestion = (s: { note: string; categoryId: string }) => {
+    setNote(s.note)
+    if (!categoryTouched && typeCategories.some((c) => c.id === s.categoryId)) {
+      setCategoryId(s.categoryId)
+    }
+    setShowSuggestions(false)
+    setActiveSuggestion(-1)
+  }
+
+  useEffect(() => {
+    if (!showSuggestions) return
+    const onClickOutside = (e: MouseEvent) => {
+      if (noteFieldRef.current && !noteFieldRef.current.contains(e.target as Node)) {
+        setShowSuggestions(false)
+        setActiveSuggestion(-1)
+      }
+    }
+    document.addEventListener('mousedown', onClickOutside)
+    return () => document.removeEventListener('mousedown', onClickOutside)
+  }, [showSuggestions])
 
   useEffect(() => {
     if (!open) return
@@ -44,6 +87,11 @@ export function TransactionModal({ open, onClose, editing }: Props) {
       setDate(todayISO())
     }
     setError('')
+    // Editing an existing transaction means its category was already a deliberate
+    // choice — an autocomplete pick must not silently overwrite it.
+    setCategoryTouched(!!editing)
+    setShowSuggestions(false)
+    setActiveSuggestion(-1)
   }, [open, editing])
 
   // Keep category valid when switching type
@@ -121,9 +169,63 @@ export function TransactionModal({ open, onClose, editing }: Props) {
               <label className="label">{t('txm.date')}</label>
               <input type="date" className="input" value={date} onChange={(e) => setDate(e.target.value)} />
             </div>
-            <div>
+            <div ref={noteFieldRef} className="relative">
               <label className="label">{t('txm.note')}</label>
-              <input className="input" placeholder={t('txm.notePlaceholder')} value={note} onChange={(e) => setNote(e.target.value)} />
+              <input
+                className="input"
+                placeholder={t('txm.notePlaceholder')}
+                value={note}
+                role="combobox"
+                aria-autocomplete="list"
+                aria-expanded={showSuggestions && noteSuggestions.length > 0}
+                aria-controls="note-suggestions-listbox"
+                aria-activedescendant={activeSuggestion >= 0 ? `note-suggestion-${activeSuggestion}` : undefined}
+                onChange={(e) => {
+                  setNote(e.target.value)
+                  setShowSuggestions(true)
+                  setActiveSuggestion(-1)
+                }}
+                onFocus={() => setShowSuggestions(true)}
+                onBlur={() => {
+                  setShowSuggestions(false)
+                  setActiveSuggestion(-1)
+                }}
+                onKeyDown={(e) => {
+                  if (!showSuggestions || noteSuggestions.length === 0) return
+                  if (e.key === 'ArrowDown') {
+                    e.preventDefault()
+                    setActiveSuggestion((i) => (i + 1) % noteSuggestions.length)
+                  } else if (e.key === 'ArrowUp') {
+                    e.preventDefault()
+                    setActiveSuggestion((i) => (i <= 0 ? noteSuggestions.length - 1 : i - 1))
+                  } else if (e.key === 'Enter' && activeSuggestion >= 0) {
+                    e.preventDefault()
+                    selectSuggestion(noteSuggestions[activeSuggestion])
+                  } else if (e.key === 'Escape') {
+                    setShowSuggestions(false)
+                    setActiveSuggestion(-1)
+                  }
+                }}
+              />
+              {showSuggestions && noteSuggestions.length > 0 && (
+                <ul id="note-suggestions-listbox" role="listbox" className="absolute z-10 mt-1 w-full overflow-hidden rounded-xl border border-ink-200 bg-white shadow-lg">
+                  {noteSuggestions.map((s, i) => (
+                    <li key={s.note} id={`note-suggestion-${i}`} role="option" aria-selected={i === activeSuggestion}>
+                      <button
+                        type="button"
+                        tabIndex={-1}
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => selectSuggestion(s)}
+                        className={`block w-full truncate px-3 py-2 text-left text-sm ${
+                          i === activeSuggestion ? 'bg-brand-50 text-brand-700' : 'text-ink-600 hover:bg-ink-50'
+                        }`}
+                      >
+                        {s.note}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
           </div>
 
@@ -134,7 +236,10 @@ export function TransactionModal({ open, onClose, editing }: Props) {
               {typeCategories.map((c) => (
                 <button
                   key={c.id}
-                  onClick={() => setCategoryId(c.id)}
+                  onClick={() => {
+                    setCategoryId(c.id)
+                    setCategoryTouched(true)
+                  }}
                   className={`flex items-center gap-2 rounded-xl border px-3 py-2.5 text-sm font-medium transition ${
                     categoryId === c.id
                       ? 'border-brand-400 bg-brand-50 text-brand-700'
