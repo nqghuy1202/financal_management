@@ -18,9 +18,7 @@
 
 ## ✨ Live demo
 
-**➡️ [Try it live](https://your-app.up.railway.app)** — then click **“Try the demo”** on the login screen to jump straight in with a pre-populated sandbox account (no sign-up needed).
-
-> Replace the link above with your deployed URL.
+**➡️ [Try it live](https://finance.hlcompany.id.vn)** — then click **“Try the demo”** on the login screen to jump straight in with a pre-populated sandbox account (no sign-up needed).
 
 ## Features
 
