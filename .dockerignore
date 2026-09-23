@@ -26,3 +26,6 @@ frontend/dev.err.log
 # Docs / misc
 img/
 *.md
+
+# MySQL bind-mount volume data (owned by container, not readable by host build user)
+data/
